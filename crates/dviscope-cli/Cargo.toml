@@ -36,7 +36,7 @@ cap-std.workspace = true
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_Debug"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["signal", "process", "resource"] }
+nix = { version = "0.32", default-features = false, features = ["signal", "process", "resource"] }
 
 [dev-dependencies]
 rustls.workspace = true
