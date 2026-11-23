@@ -1,0 +1,19 @@
+/target/
+/web/node_modules/
+/web/dist/
+# local state, never committed
+/.dviscope/
+*.pem
+*.key
+# simulator output is never committed (publication rules, CONTRIBUTING.md)
+*.log
+*.vcd
+*.fst
+*.wlf
+/deploy/tls/
+/deploy/db_password
+/deploy/secrets/
+/deploy/backups/
+__pycache__/
+*.pyc
+/web/*.tsbuildinfo

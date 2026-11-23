@@ -1,0 +1,1 @@
+doc-valid-idents = ["DVIScope", "DVICode", "SVUnit", "SimScope", "OpenTitan", "GitHub", "PostgreSQL", "WSL2", "NTSTATUS", "ECMAScript", "IEEE", "UTF-8", "UTF-16", "RFC", "..", "JSON", "UVM_FATAL", "UVM_ERROR", "SystemVerilog"]

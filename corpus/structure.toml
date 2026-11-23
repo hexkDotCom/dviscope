@@ -1,0 +1,41 @@
+# Structural expectations of the extraction engine, per group, added to what
+# `corpus.py extract-check` derives from each case's oracle and runner facts. Hand-written:
+# never generated from the extractor. Keys are those of dviscope.expect/1 (see
+# docs/packs.md). Not part of the corpus definitions digest: changing this file does not
+# invalidate labels.
+
+[group.ref-m09]
+# Error storm: every $error comes from one site with one message shape (F18, F19).
+primary = "sv:severity_task"
+families = { "sv:severity_task" = 1 }
+
+[group.ref-memlimit]
+primary = "vcs:MEM-OUT"
+
+[group.ref-m03]
+# The 32 ECC word errors differ only in indices and values: one family (F18).
+families = { "uvm:REF_ECC_WORD" = 1, "uvm:REF_MATCHED" = 1 }
+
+[group.ref-m01]
+families = { "uvm:HEXK_SB_MISMATCH" = 1, "uvm:REF_MATCHED" = 1 }
+
+[group.ref-m05]
+families = { "uvm:HEXK_SB_MISMATCH" = 1, "uvm:REF_MATCHED" = 1 }
+
+# Pairs checked across cases (fingerprints from the extracted evidence).
+[[merge]]
+# m01 (CRC on every packet) and m05 (the same symptom from another mutation) share their
+# scoreboard family (F17).
+diag_id = "uvm:HEXK_SB_MISMATCH"
+cases = ["ref-m01-{sim}-01", "ref-m05-{sim}-01"]
+
+[[merge]]
+# UVM application families do not depend on the simulator (F17).
+diag_id = "uvm:HEXK_SB_MISMATCH"
+cases = ["ref-m01-questa-01", "ref-m01-vcs-01"]
+
+[[separate_by_field]]
+# REF_MATCHED with act=0 (nothing matched) is a different signature from a wrong non-zero
+# value (F18).
+diag_id = "uvm:REF_MATCHED"
+field = "act"

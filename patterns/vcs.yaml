@@ -1,0 +1,161 @@
+# VCS message forms (compile and run). Detection uses message forms only, never the tool
+# banner or the report heading; the end of a run is the CPU time line of the trailer.
+format: dviscope.rules/1.0
+pack: vcs
+version: 1.0.0
+tier: simulator
+simulator: vcs
+exit_code_meaningful: false
+detect:
+  - '^(Error|Warning|Note|Lint|Info)-\[[A-Za-z0-9_-]+\]'
+  - '^\$finish at simulation time\s+\d+'
+  - '^CPU Time:\s+[\d.]+ seconds;\s+Data structure size:'
+  - '^(Error|Warning|Fatal|Info): "[^"]+", \d+: \S+: at time \d+'
+  - '^CPU time: [\d.]+ seconds to compile'
+normalize: [sv_literal, hex, time, path, number, whitespace]
+boundaries:
+  - '^(Error|Warning|Note|Lint|Info)-\['
+  - '^(Error|Warning|Fatal|Info): "'
+  - '^\[MEM-OUT\]'
+  - '^An unexpected termination has occurred'
+  - '^make(\[\d+\])?: '
+records:
+  # Error-[ID] title, then the location and indented detail lines (F8).
+  - id: tool_msg
+    prefix: ['Error-[', 'Warning-[', 'Note-[', 'Lint-[', 'Info-[']
+    start: '^(?P<sev>Error|Warning|Note|Lint|Info)-\[(?P<id>[A-Za-z0-9_-]+)\]\s*(?P<title>.*)$'
+    continuation:
+      max_lines: 12
+      until: blank
+      lines:
+        - {match: '^\s*"?(?P<file>[^\s",]+\.[A-Za-z]+)"?,\s*(?P<line>\d+)\s*$', capture: true, once: true}
+        - {match: '^\s*"(?P<file>[^"]+)",\s*$', capture: true, once: true}
+        - {match: '^\s+(?P<line>\d+): (?P<text>.*)$', capture: true, once: true, append_to: detail}
+        - {match: '^(?P<text>\s+\S.*|\S+, ".*")$', append_to: detail}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Error: error, Warning: warning, Lint: warning, Note: info, Info: info}}
+      diag_id: 'vcs:${id}'
+      checker_id: '${id}'
+      kind: other
+      message: '${title}'
+      anchor: {path: file, line: line}
+      identity_fields: []
+      display_fields: [detail]
+  # $error / $warning / $fatal / $info: header line, message on the next line (F11).
+  - id: severity_task
+    prefix: ['Error: "', 'Warning: "', 'Fatal: "', 'Info: "']
+    start: '^(?P<sev>Error|Warning|Fatal|Info): "(?P<file>[^"]+)", (?P<line>\d+): (?P<scope>\S+): at time (?P<t>\d+(?:\.\d+)?) ?(?P<u>[a-z]+)$'
+    continuation:
+      max_lines: 1
+      lines:
+        - {match: '^(?P<msg>.*)$', capture: true, mandatory: true}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Info: info, Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'sv:severity_task'
+      kind: check
+      family: assertion
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      context: '${scope}'
+      fatal_witness: true
+  # Concurrent assertion failure.
+  - id: assertion_failure
+    prefix: '"'
+    start: '^"(?P<file>[^"]+)", (?P<line>\d+): (?P<prop>\S+): started at (?P<t0>\d+)(?P<u0>[a-z]*) failed at (?P<t>\d+)(?P<u>[a-z]*)$'
+    continuation:
+      max_lines: 2
+      lines:
+        - {match: '^\s+Offending (?P<text>.*)$', append_to: detail}
+    emit:
+      framework: assertion
+      severity: error
+      diag_id: 'sva:failure'
+      checker_id: '${prop}'
+      checker_scope: '${prop}'
+      kind: assertion
+      message: 'assertion failed'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      display_fields: [detail]
+  - id: out_of_memory
+    prefix: '[MEM-OUT]'
+    start: '^\[MEM-OUT\] (?P<msg>.*)$'
+    continuation:
+      max_lines: 1
+      lines:
+        - {match: '^(?P<text>Memory allocated .*)$', append_to: detail}
+    emit:
+      framework: simulator
+      severity: fatal
+      diag_id: 'vcs:MEM-OUT'
+      kind: resource
+      message: '${msg}'
+      display_fields: [detail]
+  - id: unexpected_termination
+    prefix: 'An unexpected termination has occurred'
+    start: '^An unexpected termination has occurred(?P<msg>.*)$'
+    emit:
+      framework: simulator
+      severity: fatal
+      diag_id: 'vcs:unexpected_termination'
+      kind: crash
+      message: 'unexpected termination'
+  - id: note
+    prefix: 'Note: '
+    start: '^Note: (?P<msg>.*)$'
+  - id: info_tagged
+    prefix: 'Info: ['
+    start: '^Info: \[(?P<id>[A-Za-z0-9_]+)\] (?P<msg>.*)$'
+    continuation:
+      max_lines: 2
+      lines:
+        - {match: '^Please use .*$'}
+markers:
+  - {id: finish, match: '^\$finish at simulation time\s+\d+', design_loaded: true}
+  - {id: cpu_time, match: '^CPU Time:\s+[\d.]+ seconds;\s+Data structure size:', trailer: true}
+  - {id: compile_done, match: '^CPU time: [\d.]+ seconds to compile'}
+  - {id: runtime_started, match: '^Compiler version \S+; Runtime version \S+;', design_loaded: true}
+completion:
+  profiles:
+    - {name: vcs-compile, subject: build, requires: [compile_done]}
+    - name: vcs-run
+      subject: simulation
+      requires: [cpu_time]
+      verdict_required: true
+      early_fatal: true
+tests:
+  - name: tool message with a split location ends at a blank line
+    simulator: vcs
+    subject: build
+    input: |
+      Error-[XY] Something is wrong
+        "top.sv",
+        12: token is ';'
+           logic x = ;
+
+      CPU time: .1 seconds to compile
+    events: ['vcs:XY@1']
+    completion: complete
+  - name: severity task body that reads like an error stays the body
+    simulator: vcs
+    input: |
+      Error: "top.sv", 7: top: at time 10 ps
+      Error: this body reads like a generic error
+      Error-[AB] next
+    events: ['sv:severity_task@1', 'vcs:AB@3']
+  - name: a missing body at the end cuts the record
+    simulator: vcs
+    input: |
+      Error: "top.sv", 7: top: at time 10 ps
+    events: ['sv:severity_task@1']
+    record_cuts: 1
+  - name: a boundary where the body was expected cuts the record
+    simulator: vcs
+    input: |
+      Error: "top.sv", 7: top: at time 10 ps
+      Error-[AB] next
+    events: ['sv:severity_task@1', 'vcs:AB@2']
+    record_cuts: 1

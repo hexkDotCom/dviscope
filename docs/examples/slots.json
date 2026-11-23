@@ -1,0 +1,4 @@
+{"schema": "dviscope.manifest/1.0-dev.3", "slots": [
+  {"slot_ref": "uart_tx.s1", "exec_inputs": {"test": "uart_tx", "seed": "1"}, "required": true},
+  {"slot_ref": "uart_rx.s1", "exec_inputs": {"test": "uart_rx", "seed": "1"}, "required": true}
+]}

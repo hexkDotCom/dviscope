@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SlotMark",
+  "description": "`POST .../slots/mark`.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier.",
+      "type": "string"
+    },
+    "slot_refs": {
+      "description": "The slots.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ExternalKey"
+      }
+    },
+    "state": {
+      "description": "Declared state.",
+      "$ref": "#/$defs/MarkState"
+    },
+    "reason": {
+      "description": "Why.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "slot_refs",
+    "state",
+    "reason"
+  ],
+  "$defs": {
+    "ExternalKey": {
+      "description": "A producer-chosen external key (`regression_ref`, `slot_ref`, ...): 1–200 characters of\n`[A-Za-z0-9._:/@+-]`, unique within `(project, producer, kind)`.",
+      "type": "string"
+    },
+    "MarkState": {
+      "description": "Declared state of slots that will not run.",
+      "oneOf": [
+        {
+          "description": "Cancelled by the runner.",
+          "type": "string",
+          "const": "cancelled"
+        },
+        {
+          "description": "Skipped on purpose.",
+          "type": "string",
+          "const": "skipped"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+# cargo-deny: licenses, advisories, bans, sources.
+[licenses]
+allow = ["Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib", "MPL-2.0", "CDLA-Permissive-2.0"]
+confidence-threshold = 0.9
+
+[advisories]
+yanked = "deny"
+ignore = [
+  # An "unmaintained" notice with no known vulnerability. It comes in through axum-server 0.7
+  # and only reads the TLS certificate and key files the operator configures.
+  { id = "RUSTSEC-2025-0134", reason = "unmaintained, no vulnerability; remove with the axum-server upgrade" },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace crates are not published to crates.io, so their path dependencies carry no version.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

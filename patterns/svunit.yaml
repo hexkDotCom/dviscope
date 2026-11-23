@@ -1,0 +1,77 @@
+# SVUnit test output and runner summaries.
+format: dviscope.rules/1.0
+pack: svunit
+version: 1.0.0
+tier: svunit
+# SVUnit tests use UVM components without run_test(): the runner summary replaces the
+# UVM report summary.
+replaces: [uvm_summary]
+detect:
+  - '^INFO:  \[\d+\]\[[^\]]+\]: '
+  - '^ERROR: \[\d+\]\[[^\]]+\]: '
+normalize: [sv_literal, hex, path, whitespace]
+records:
+  # ERROR: [time][suite_or_test]: kind: detail (at file line:N)
+  - id: check_failure
+    prefix: 'ERROR: ['
+    start: '^ERROR: \[(?P<t>\d+)\]\[(?P<unit>[^\]]+)\]: (?P<check>\w+): (?P<msg>.*?)(?: \(at (?P<file>\S+) line:(?P<line>\d+)\))?$'
+    emit:
+      framework: svunit
+      severity: error
+      diag_id: 'svunit:${check}'
+      checker_id: '${check}'
+      checker_scope: '${unit}'
+      kind: check
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      context: '${unit}'
+  - id: test_failed
+    prefix: 'INFO:  ['
+    start: '^INFO:  \[(?P<t>\d+)\]\[(?P<unit>[^\]]+)\]: (?P<test>\w+)::FAILED$'
+    emit:
+      framework: svunit
+      severity: error
+      diag_id: 'svunit:test_failed'
+      checker_id: '${test}'
+      # The test name is identity, kept verbatim (never normalized).
+      checker_scope: '${unit}::${test}'
+      kind: check
+      message: 'unit test failed'
+      context: '${unit}'
+  - id: info
+    prefix: 'INFO:  ['
+    start: '^INFO:  \[\d+\]\[[^\]]+\]: .*$'
+verdicts:
+  - id: runner_summary
+    source: svunit_runner
+    match: '^INFO:  \[\d+\]\[testrunner\]: (?P<v>PASSED|FAILED) \(\d+ of \d+ suites passing\)'
+    value: {from: v, map: {PASSED: pass, FAILED: fail}}
+markers:
+  - {id: runner_summary_line, match: '^INFO:  \[\d+\]\[testrunner\]: (PASSED|FAILED) \(\d+ of \d+ suites passing\)'}
+counters:
+  - id: runner_suites
+    domain: svunit
+    protected: true
+    match: '^INFO:  \[\d+\]\[testrunner\]: (PASSED|FAILED) \((?P<p>\d+) of (?P<n>\d+) suites passing\)'
+    values:
+      - {key: suites_passing, from: p, role: success_count}
+      - {key: suites, from: n, role: info}
+sections:
+  - id: svunit_runner
+    open: runner_summary_line
+    requires: [runner_summary_line]
+completion:
+  requires_when_active: [svunit_runner]
+tests:
+  - name: failing check and test
+    input: |
+      INFO:  [0][u_ut]: t1::RUNNING
+      ERROR: [0][u_ut]: fail_unless: x != y (at u.sv line:7)
+      INFO:  [0][u_ut]: t1::FAILED
+      INFO:  [0][testrunner]: FAILED (0 of 1 suites passing) [SVUnit 1.0]
+    events: ['svunit:fail_unless@2', 'svunit:test_failed@3']
+  - name: two failing tests of one unit stay two families
+    input: |
+      INFO:  [0][u_ut]: abc123::FAILED
+      INFO:  [0][u_ut]: abc124::FAILED
+    events: ['svunit:test_failed@1', 'svunit:test_failed@2']

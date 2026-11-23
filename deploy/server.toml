@@ -1,0 +1,10 @@
+# DVIScope server configuration for the compose recipe.
+listen = "0.0.0.0:8443"
+public_origin = "https://127.0.0.1:8443"
+
+[tls]
+cert_file = "/etc/dviscope/tls/server.pem"
+key_file = "/etc/dviscope/tls/server.key"
+
+[database]
+url_file = "/run/secrets/db_url"

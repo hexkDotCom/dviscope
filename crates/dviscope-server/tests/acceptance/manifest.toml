@@ -1,0 +1,282 @@
+# Acceptance manifest. Each case names its requirement, the stage and
+# layer where it first passes, and an oracle written independently of the implementation.
+# `status` is "planned" until a test implements it; the test then references the case ID.
+# Inputs are generated structured data; simulator-specific cases also run in the private
+# corpus gate and are marked `private = true`.
+
+schema = "dviscope.acceptance/1"
+
+[[case]]
+id = "A01"
+title = "Duplicate delivery"
+requirement = "B.3 idempotency, B.15"
+stage = 3
+layer = "app+db"
+oracle = "Counts unchanged after resending; revision 1 replayed after revision 2 returns revision 1's original receipt; same revision with another payload -> 409 E_REVISION_CONFLICT."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s3.rs::a01_duplicate_delivery"
+
+[[case]]
+id = "A02"
+title = "Retries and policies"
+requirement = "B.7.2"
+stage = 4
+layer = "core+app"
+oracle = "strict keeps fail->pass failed; retry-pass-accepted gives passed with note 'cleared by accepted retry (retry-pass-accepted v1)'; fail->ineligible pass stays failed; a different seed -> 409 E_RETRY_INPUTS_DIFFER naming the field (execution); a report from another source is stored but not eligible (B.7.2 table: 'Report received; not eligible: source')."
+status = "implemented"
+test = "crates/dviscope-core/tests/settlement_cases.rs::a02_retry_policies, crates/dviscope-server/tests/acceptance_s4_cases.rs::a02_retry_inputs_and_sources and a15_contradiction_and_accepted_retry (exact note)"
+
+[[case]]
+id = "A03a"
+title = "Builds: adjudication and storage"
+requirement = "B.7.3"
+stage = 3
+layer = "core+app"
+oracle = "One build failure with blocked dependents and no fabricated attempts; fail->pass leaves dependents missing until run; pass->fail blocks dependents not yet run and keeps results of slots run on the passing build; concurrent regressions building one requirement get distinct build_order; a foreign-source build in a batch is rejected and the rest committed; 25 runtime elaboration failures -> 25 blocked{elaboration}; a passing rebuild clears only slots whose later attempts load the design."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s3.rs::a03a_builds, crates/dviscope-core/tests/settlement_cases.rs::a03_builds_and_elaboration"
+note = "Batch rejection is per record (http_db.rs::collection_over_http); 25 settled elaboration attempts are covered by the comparison group test (A03b) on settled states."
+
+[[case]]
+id = "A03b"
+title = "Builds: comparison row"
+requirement = "B.8"
+stage = 4
+layer = "http+ui"
+oracle = "The comparison shows one elaboration row with 25 blocked slots."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4.rs::a03b_build_group_row and crates/dviscope-core/src/compare.rs::blocked_slots_without_signatures_form_group_rows"
+
+[[case]]
+id = "A04"
+title = "Missing and not-run required slots"
+requirement = "B.7.5, B.11"
+stage = 4
+layer = "core"
+oracle = "Missing required result blocks merge; optional does not; required skipped -> blocker required_not_run, not exceptable."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4.rs::a04_obligations_and_closure (and core readiness tests)"
+
+[[case]]
+id = "A05"
+title = "Conservation"
+requirement = "B.7"
+stage = 3
+layer = "core+app"
+oracle = "Slot states sum to the planned count across chunks, seal, amendments, marks and late reports."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s3.rs::a05_conservation"
+
+[[case]]
+id = "A06"
+title = "Order independence"
+requirement = "B.7, B.11"
+stage = 2
+layer = "core"
+oracle = "(a) identical settlement for any order of the same accepted facts including assigned build_order values; (b) exact accepted/duplicate/stale responses per schedule (stage 3); (c) the same captured snapshot always yields the same digest (stage 4)."
+status = "implemented"
+test = "crates/dviscope-core/tests/settlement_cases.rs::a06a_order_invariance, crates/dviscope-server/tests/acceptance_s3.rs::a14_forced_interleavings, crates/dviscope-server/tests/acceptance_s4_cases.rs::a06c_same_snapshot_same_digest"
+
+[[case]]
+id = "A07"
+title = "Incomplete evidence never passes"
+requirement = "B.6, B.9.3"
+stage = 2
+layer = "core"
+oracle = "Truncated, killed, timeout, empty, accounting overflow, unknown profile and unknown termination with a complete-looking log never yield pass, met or exception coverage; warning-only logs and success counters pass; a diagnostic lost beyond a cut inside a failure record makes evidence incomplete."
+status = "implemented"
+test = "crates/dviscope-core/tests/outcome_cases.rs::a07_incomplete_evidence_never_passes, crates/dviscope-core/tests/extract_engine.rs, crates/dviscope-core/tests/review_2b_r1.rs, crates/dviscope-core/src/readiness.rs::evidence_problems_are_never_excepted"
+
+[[case]]
+id = "A08"
+title = "Error storm with PASSED banner"
+requirement = "B.6, B.9.4, F2"
+stage = 2
+layer = "core+private"
+private = true
+oracle = "Fails with a project rule; on Questa also without (sim_tool counter); on VCS also without (authoritative $error); a rule suppressing every storm line still fails with UNEXPLAINED_FAILURE; a broad project rule cannot consume a protected counter, banner or completion marker."
+status = "implemented"
+test = "crates/dviscope-core/tests/outcome_cases.rs::a08_error_storm_with_passing_summary_fails, crates/dviscope-core/tests/review_2b_r1.rs, crates/dviscope-core/tests/extract_engine.rs"
+note = "Questa and VCS storms without project rules are also checked in the private corpus gate."
+
+[[case]]
+id = "A09"
+title = "Expectations"
+requirement = "B.5"
+stage = 4
+layer = "core+app"
+oracle = "Truth table incl. unexpected pass, right ID wrong site with examples evicted, wrong severity, expected diagnostics plus timeout, extra warning with extras none, overlapping selectors rejected, one expected bucket with UVM error counter 10 -> not_met; end to end: SVUnit pass with expected errors -> passed, verdict pass; hexk expected failure met -> pass; hexk_ref_stall_test -> complete early_fatal, met, passed, pass."
+status = "implemented"
+test = "crates/dviscope-core/tests/outcome_cases.rs::a09_expectation_truth_table and a09_pass_with_expected_diagnostics_and_early_fatal, crates/dviscope-core/src/expectation.rs"
+note = "The hexk end-to-end parts (expected failure met, hexk_ref_stall_test) run on real simulator logs in the private corpus gate (Stage 7 qualification)."
+
+[[case]]
+id = "A10"
+title = "Exception expiry"
+requirement = "B.10, B.11"
+stage = 4
+layer = "core"
+oracle = "Verdict and digest change at valid_until."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4.rs::a10_a13_exceptions_and_expiry"
+
+[[case]]
+id = "A11"
+title = "Quarantine"
+requirement = "B.7.2 rule 1, B.17"
+stage = 3
+layer = "app+db"
+oracle = "A token's revisions since a receipt time -> insufficient_evidence, never an older pass; quarantined passing correction over an older clean pass blocked; attempt 1 pass, attempt 2 fail quarantined -> failed{insufficient}; a later valid attempt clears; release restores. (verdict part: stage 4)"
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s3.rs::a11_quarantine (verdict part: stage 4)"
+
+[[case]]
+id = "A12"
+title = "Pipelines and generations"
+requirement = "B.9.5"
+stage = 5
+layer = "app+db"
+oracle = "Unknown digest -> ineligible with blocker; delayed spool delivery across an activation keeps pipeline A; correction keeps generation; new attempt uses the new one."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s5.rs::a12_pipelines_and_generations"
+
+[[case]]
+id = "A13"
+title = "Attestation and change counter"
+requirement = "B.11"
+stage = 4
+layer = "app+db"
+oracle = "An attestation added in the same second as an evaluation changes the next digest."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4_feature.rs::c16_feature_mode_and_c13_attestation_digest"
+
+[[case]]
+id = "A14"
+title = "Forced interleavings"
+requirement = "B.15"
+stage = 3
+layer = "app+db"
+oracle = "Seal vs chunk, competing amendments, finish vs late report, two revisions in both orders: exact responses and rows asserted."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s3.rs::a14_forced_interleavings"
+
+[[case]]
+id = "A15"
+title = "Verdict counterexamples"
+requirement = "B.11"
+stage = 4
+layer = "core"
+oracle = "Producer pass + failure bucket + matching exception -> contradiction blocker; two families, one excepted -> fail; eligible fail->pass under retry-pass-accepted -> pass with history visible and no exception used."
+status = "implemented"
+test = "crates/dviscope-core/src/readiness.rs::tests, crates/dviscope-server/tests/acceptance_s4_cases.rs::a15_contradiction_and_accepted_retry"
+
+[[case]]
+id = "A16"
+title = "Feature selection"
+requirement = "B.11 feature mode, B.12"
+stage = 4
+layer = "core+app"
+oracle = "Old regression delivered after a newer one is not the candidate; skew-flagged -> outdated (time uncertain); R1 all pass seeds 1-3, R2 newer seed 2 fails -> failed with candidate R2; R2 quarantined -> insufficient, candidate R2; R3 newer incomplete -> missing (candidate incomplete); freshness at -1s/0/+1s; unmatched selector -> missing; changed evidence digest -> unreviewed; one seed twice does not satisfy min_passing_seeds 2."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4_feature.rs::c16_feature_mode_and_c13_attestation_digest (and core feature tests)"
+
+[[case]]
+id = "A17"
+title = "Comparison"
+requirement = "B.8"
+stage = 4
+layer = "app+db"
+oracle = "Repository-qualified branch isolation; overlap labels; distinct-slot counts despite many events; a correction replaces the old classification."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4_cases.rs::a17_comparison, crates/dviscope-core/src/compare.rs::tests"
+
+[[case]]
+id = "A18"
+title = "Rule activation"
+requirement = "B.9.4"
+stage = 5
+layer = "core+app"
+oracle = "Stale check result rejected; a lost must-survive failure blocks; local and server checks give identical structural results."
+status = "implemented"
+test = "crates/dviscope-core/tests/rule_check.rs::a18_a_lost_must_survive_failure_blocks, crates/dviscope-server/tests/acceptance_s5.rs::a18::a18_rule_activation, crates/dviscope-cli/tests/server_e2e.rs::sample_upload_and_rules_import"
+
+[[case]]
+id = "A19"
+title = "Retention"
+requirement = "B.16"
+stage = 3
+layer = "app+db"
+oracle = "Payload expiry keeps comparison answers (stage 3) and readiness answers (stage 4); fact expiry; shared build kept; correction after payload expiry accepted, after fact expiry -> E_EXPIRED; receipt expiry -> E_REPLAY_EXPIRED; nothing resurrected; soft-deleted objects never purged without the admin purge."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_a19.rs::a19_retention (readiness part: stage 4; soft delete and purge: later stages)"
+
+[[case]]
+id = "A20"
+title = "Transaction failure injection"
+requirement = "B.15"
+stage = 3
+layer = "app+db"
+oracle = "Failure after evidence insert, before head/receipt: no partial revision; retry succeeds once."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_a20.rs::a20_transaction_failure_injection"
+
+[[case]]
+id = "A21"
+title = "Delivery and recovery"
+requirement = "B.19"
+stage = 3
+layer = "cli"
+oracle = "Supervisor death before launch, during execution and after child exit before runner facts -> never a pass, RUNNER_UNKNOWN, new attempt required; no loss or duplication at the crash points; a rejected manifest chunk blocks its dependent reports while another regression flows."
+status = "implemented"
+test = "crates/dviscope-cli/tests/run_journal.rs, review_2c_r*.rs, server_e2e.rs::a21_a_rejected_chunk_blocks_only_its_regression"
+
+[[case]]
+id = "A22"
+title = "Quarantined expected-set change"
+requirement = "B.7.6"
+stage = 4
+layer = "core+app"
+oracle = "A quarantined removal does not shrink the denominator; readiness insufficient_evidence until re-made or released."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4_cases.rs::a22_quarantined_removal"
+
+[[case]]
+id = "A23"
+title = "Publication receipts"
+requirement = "B.11"
+stage = 4
+layer = "app+python"
+oracle = "The status link opens the published receipt after corrections and expiry; the status becomes pending or the new verdict within the bound while the publisher runs, incl. an exception expiring on day 20 and a restart in between; undated successes become pending: monitoring ended after 14 days."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4.rs::a23_publication_receipts and python/tests/test_publish_status.py"
+
+[[case]]
+id = "A24"
+title = "Assurance profile"
+requirement = "B.18"
+stage = 5
+layer = "app"
+oracle = "A producer sending sealed manifests but no build attempts or source manifests shows: counting available; build provenance missing; merge gating unavailable."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s5.rs::a24_assurance_profile, crates/dviscope-cli/tests/server_e2e.rs::doctor_prints_the_assurance_profile (a regression needs a source manifest record; one naming no repository carries no source identity and counts as none)"
+
+[[case]]
+id = "A25"
+title = "Cannot become greener"
+requirement = "B.7, B.11, B.16"
+stage = 4
+layer = "core"
+oracle = "For a failing regression: quarantine, payload expiry, cuts, exception expiry, a removal by a quarantined credential, a delayed old delivery, withdrawal of the pipeline of a failing retry (also when delivered after withdrawal), and expiry or deletion of a newer feature candidate never turn the verdict into pass, accepted_with_exceptions or satisfied."
+status = "implemented"
+test = "crates/dviscope-server/tests/acceptance_s4_cases.rs::a25_withdrawn_pipeline_of_a_failing_retry, a22_quarantined_removal; acceptance_s3.rs::a11_quarantine; acceptance_a19.rs; acceptance_s4.rs::a10_a13_exceptions_and_expiry; acceptance_s4_feature.rs (expired and deleted candidates); core feature tests"
+
+[[case]]
+id = "A26"
+title = "Counterexamples"
+requirement = "B.6, B.7.3, B.11, B.19"
+stage = 4
+layer = "core+cli"
+oracle = "Quarantined B2 with an older passing B1 -> failed{insufficient}; truncated run with only an excepted failure -> incomplete_evidence blocker; referenced build without terminal report while B2 passes -> failed{insufficient}; finish refused until pending starts are committed, also across journals; producer fail with a clean log -> fail with UNEXPLAINED_FAILURE; elaboration failure without design_loaded line -> blocked{elaboration} with one group; compressible batch sent uncompressed; undated success -> pending after 15 days, also across a restart."
+status = "implemented"
+test = "crates/dviscope-core/tests/settlement_cases.rs::a26_build_proof, crates/dviscope-core/tests/outcome_cases.rs::a26e_* and a26f_*, crates/dviscope-cli/tests/review_2c_r1.rs, python/tests/test_publish_status.py"
+note = "The collector never compresses batches (transport.rs), so a compressible batch is always sent uncompressed."

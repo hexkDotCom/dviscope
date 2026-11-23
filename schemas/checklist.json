@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Checklist",
+  "description": "A checklist version.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "`dviscope.checklist/1.0` (optional in files; checked when present).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checklist_id": {
+      "description": "Stable checklist identifier.",
+      "type": "string"
+    },
+    "title": {
+      "description": "Title.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Version label (each import of a new version is immutable).",
+      "type": "string"
+    },
+    "feature": {
+      "description": "The feature it signs off.",
+      "type": "string"
+    },
+    "owner": {
+      "description": "Checklist owner.",
+      "type": "string"
+    },
+    "items": {
+      "description": "Items.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ChecklistItem"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "checklist_id",
+    "title",
+    "version",
+    "feature",
+    "owner",
+    "items"
+  ],
+  "$defs": {
+    "ChecklistItem": {
+      "description": "One requirement.",
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "description": "Stable item identifier (matched across versions).",
+          "type": "string"
+        },
+        "title": {
+          "description": "Title.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Item owner (falls back to the checklist owner).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requires": {
+          "description": "What must have passed.",
+          "$ref": "#/$defs/Requires"
+        },
+        "applies_to": {
+          "description": "Where the item applies (default: everywhere).",
+          "$ref": "#/$defs/AppliesTo",
+          "default": {}
+        },
+        "freshness_days": {
+          "description": "The evidence must be at most this many days old.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "evidence": {
+          "description": "External evidence (declared, not verified in 0.1); needs an attestation.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExternalEvidence"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "title",
+        "requires",
+        "freshness_days"
+      ]
+    },
+    "Requires": {
+      "description": "Required tests and configurations.",
+      "type": "object",
+      "properties": {
+        "tests": {
+          "description": "Test name globs (`*`, `?`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "configs": {
+          "description": "Configuration labels (simulator vendor, e.g. `questa`) or config digests\n(`sha256:…`); empty: any configuration.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "min_passing_seeds": {
+          "description": "Distinct passing seeds needed per test and configuration (default 1).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "tests"
+      ]
+    },
+    "AppliesTo": {
+      "description": "Applicability.",
+      "type": "object",
+      "properties": {
+        "branch": {
+          "description": "Only this repository-qualified branch (`repo/name`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repositories": {
+          "description": "Only branches of these repositories.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExternalEvidence": {
+      "description": "A piece of external evidence.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name.",
+          "type": "string"
+        },
+        "digest": {
+          "description": "Declared digest of the evidence.",
+          "$ref": "#/$defs/Digest"
+        },
+        "uri_hint": {
+          "description": "Where a reviewer finds it (never fetched).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "digest"
+      ]
+    },
+    "Digest": {
+      "description": "A `sha256:<64 lowercase hex>` digest.",
+      "type": "string"
+    }
+  }
+}

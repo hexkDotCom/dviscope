@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ManifestSeal",
+  "description": "`POST .../manifest/seal`.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier.",
+      "type": "string"
+    },
+    "revision": {
+      "description": "Manifest revision being sealed.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "slot_count": {
+      "description": "Number of slots in that revision.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "manifest_digest": {
+      "description": "Manifest digest.",
+      "$ref": "#/$defs/Digest"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "revision",
+    "slot_count",
+    "manifest_digest"
+  ],
+  "$defs": {
+    "Digest": {
+      "description": "A `sha256:<64 lowercase hex>` digest.",
+      "type": "string"
+    }
+  }
+}

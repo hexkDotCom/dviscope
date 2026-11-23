@@ -1,0 +1,10 @@
+# Never in an image build context: build output, VCS data, and everything the deploy
+# scripts provision (secrets, keys, backups).
+target
+.git
+web/node_modules
+web/dist
+deploy/tls
+deploy/secrets
+deploy/backups
+deploy/db_password

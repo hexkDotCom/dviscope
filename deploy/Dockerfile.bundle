@@ -1,0 +1,17 @@
+# DVIScope images from a release bundle (copied into the bundle as deploy/Dockerfile; the
+# build context is the bundle's root): no compiler, no Node, no download but the base
+# image of `ops` (postgres:17-bookworm, the bundle's one external prerequisite).
+#   server  the bundle's static binary and web UI on an empty base (the default target)
+#   ops     the same binary beside the PostgreSQL 17 client tools, for backup and restore
+FROM postgres:17-bookworm AS ops
+COPY bin/dviscope-server /usr/local/bin/dviscope-server
+USER 10001:10001
+ENTRYPOINT ["/usr/local/bin/dviscope-server", "--config", "/etc/dviscope/dviscope-server.toml"]
+
+FROM scratch AS server
+COPY bin/dviscope-server /dviscope-server
+COPY ui /ui
+ENV DVISCOPE_SERVER_UI_DIR=/ui
+USER 10001:10001
+EXPOSE 8443
+ENTRYPOINT ["/dviscope-server", "--config", "/etc/dviscope/dviscope-server.toml"]

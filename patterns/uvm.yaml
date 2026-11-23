@@ -1,0 +1,91 @@
+# UVM report lines and the standard report summary. Rules only; the self-tests use
+# invented text.
+format: dviscope.rules/1.0
+pack: uvm
+version: 1.0.0
+tier: uvm
+detect:
+  - '^UVM_(INFO|WARNING|ERROR|FATAL)\b'
+  - '^--- UVM Report Summary ---$'
+normalize: [sv_literal, hex, time, path, number, whitespace]
+boundaries:
+  - '^UVM_(INFO|WARNING|ERROR|FATAL)\b'
+  - '^--- UVM Report (Summary|catcher Summary) ---$'
+records:
+  - id: report
+    prefix: [UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL]
+    start: '^UVM_(?P<sev>INFO|WARNING|ERROR|FATAL)(?: (?P<file>[^\s(]+)\((?P<line>\d+)\))? @ (?P<t>\d+(?:\.\d+)?) ?(?P<u>[a-z]*): (?P<ctx>\S+) \[(?P<id>[^\]]+)\] ?(?P<msg>.*)$'
+    continuation:
+      max_lines: 200
+      until: blank
+      lines:
+        - {match: '^(?P<text>.*)$', append_to: detail}
+    emit:
+      framework: uvm
+      severity: {from: sev, map: {INFO: info, WARNING: warning, ERROR: error, FATAL: fatal}}
+      diag_id: 'uvm:${id}'
+      checker_id: '${id}'
+      checker_scope: '${ctx}'
+      kind: check
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      context: '${ctx}'
+      display_fields: [detail]
+      fatal_witness: true
+  - id: catcher_summary
+    prefix: '--- UVM Report catcher Summary ---'
+    start: '^--- UVM Report catcher Summary ---$'
+    continuation:
+      max_lines: 12
+      lines:
+        - {match: '^(Number of .*)?$'}
+markers:
+  - {id: uvm_summary_heading, match: '^--- UVM Report Summary ---$'}
+counters:
+  - id: uvm_severity_count
+    domain: uvm_severity
+    within: uvm_summary
+    protected: true
+    match: '^UVM_(?P<sev>INFO|WARNING|ERROR|FATAL) :\s*(?P<n>\d+)$'
+    values:
+      - key: 'UVM_${sev}'
+        keys: [UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL]
+        from: n
+        role: {from: sev, map: {INFO: info, WARNING: warning_count, ERROR: failure_count, FATAL: failure_count}}
+  - id: uvm_id_count
+    domain: uvm_by_id
+    within: uvm_summary
+    match: '^\[(?P<id>[^\]]+)\]\s+(?P<n>\d+)$'
+    values:
+      - {key: '${id}', from: n, role: info}
+sections:
+  - id: uvm_summary
+    open: uvm_summary_heading
+    requires: ['uvm_severity:UVM_INFO', 'uvm_severity:UVM_WARNING', 'uvm_severity:UVM_ERROR', 'uvm_severity:UVM_FATAL']
+    verdict: {source: uvm_summary, fail_if_nonzero: ['uvm_severity:UVM_ERROR', 'uvm_severity:UVM_FATAL']}
+completion:
+  requires_when_active: [uvm_summary]
+reconcile:
+  - template: uvm_errors
+    counters: ['uvm_severity:UVM_ERROR', 'uvm_severity:UVM_FATAL']
+    frameworks: [uvm]
+    severities: [error, fatal]
+tests:
+  - name: report with a multi-line message ends at a blank line
+    input: |
+      UVM_ERROR src/chk.sv(12) @ 40: env.chk [CHK_VALUE] value 3 differs
+      first detail line
+      second detail line
+
+      UVM_INFO @ 50: reporter [DONE] done
+    events: ['uvm:CHK_VALUE@1', 'uvm:DONE@5']
+  - name: summary counters close the section
+    input: |
+      UVM_ERROR @ 40: env.chk [CHK_VALUE] value 3 differs
+      --- UVM Report Summary ---
+      UVM_INFO :    0
+      UVM_WARNING :    0
+      UVM_ERROR :    1
+      UVM_FATAL :    0
+    events: ['uvm:CHK_VALUE@1']

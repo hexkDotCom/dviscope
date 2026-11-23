@@ -1,0 +1,88 @@
+# Applicability matrix (schema dviscope.corpus/1). For every design and
+# simulator pair: the fault classes that apply, and a reason for every class that does not.
+# `control` is the clean run that mutant labels depend on. Every applicable cell must have at
+# least one labelled corpus case (corpus.py manifest checks it); the qualification campaign
+# runs every applicable cell `repetitions` times.
+
+schema = "dviscope.corpus/1"
+repetitions = 2
+classes = ["control", "functional", "data_dependent", "x_injection", "model_bug", "syntax_error",
+           "elaboration_error", "zero_time_hang", "error_storm", "failing_unit_test", "kill",
+           "timeout", "bad_test_name", "bad_knob", "memory_limit"]
+
+[[pair]]
+design = "hexk-ref"
+sim = "questa"
+apply = ["control", "functional", "data_dependent", "x_injection", "model_bug", "syntax_error",
+         "elaboration_error", "zero_time_hang", "error_storm", "timeout", "bad_test_name", "bad_knob"]
+[pair.reasons]
+failing_unit_test = "not a unit-test design"
+kill = "on Windows the runner's timeout already ends the process tree forcibly (taskkill /F); a separate kill cell adds nothing"
+memory_limit = "address-space limits are a POSIX runner feature; covered on WSL"
+
+[[pair]]
+design = "hexk-ref"
+sim = "vcs"
+apply = ["control", "functional", "data_dependent", "x_injection", "model_bug", "syntax_error",
+         "elaboration_error", "zero_time_hang", "error_storm", "kill", "timeout", "bad_test_name",
+         "bad_knob", "memory_limit"]
+[pair.reasons]
+failing_unit_test = "not a unit-test design"
+
+[[pair]]
+design = "hexk-unit"
+sim = "verilator"
+apply = ["control", "failing_unit_test"]
+[pair.reasons]
+functional = "testbench fault classes are covered on hexk-ref; the unit design's oracle is the suite summary"
+data_dependent = "as functional"
+x_injection = "as functional"
+model_bug = "as functional"
+syntax_error = "as functional"
+elaboration_error = "as functional"
+zero_time_hang = "as functional"
+error_storm = "as functional"
+kill = "runtime classes are covered on hexk-ref; the unit runner adds its own timeout"
+timeout = "as kill"
+bad_test_name = "the unit runner selects suites by directory; no test-name argument"
+bad_knob = "the unit suites take no knobs"
+memory_limit = "as kill"
+
+[[pair]]
+design = "hexk-unit"
+sim = "questa"
+deferred = "the Makefile has a Questa SVUnit flow; not wired into the harness in 2a"
+
+[[pair]]
+design = "hexk-unit"
+sim = "vcs"
+deferred = "the Makefile has no VCS SVUnit flow"
+
+[[pair]]
+design = "quirks"
+sim = "verilator"
+apply = ["control"]
+default_reason = "quirk probes are portable micro-designs; their oracle is the recorded outcome per tool, not a fault"
+
+[[pair]]
+design = "quirks"
+sim = "vcs"
+apply = ["control"]
+default_reason = "quirk probes are portable micro-designs; their oracle is the recorded outcome per tool, not a fault"
+
+[[pair]]
+design = "quirks"
+sim = "questa"
+apply = ["control"]
+default_reason = "quirk probes are portable micro-designs; their oracle is the recorded outcome per tool, not a fault"
+
+[[pair]]
+design = "ibex"
+sim = "verilator"
+apply = ["control", "functional"]
+default_reason = "the DVICode design proves that a second, real design works end to end; fault classes are covered on hexk-ref"
+
+[[pair]]
+design = "ibex"
+sim = "vcs"
+deferred = "simple_system on VCS needs the fusesoc VCS flow; not attempted in 2a"

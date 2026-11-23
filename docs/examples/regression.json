@@ -1,0 +1,5 @@
+{"schema": "dviscope.ingest/1.0-dev.3", "producer_id": "nightly-runner",
+ "regression_ref": "nightly-2026-11-10", "suite": "nightly",
+ "branch": {"repository": "rtl", "name": "main"},
+ "source_manifest_ref": "sm-2026-11-10", "trigger": {"kind": "nightly"},
+ "started_at": "2026-11-10T01:00:00Z"}

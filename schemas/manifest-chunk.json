@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ManifestChunk",
+  "description": "`PUT .../regressions/{r}/manifest/chunks/{n}`.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier.",
+      "type": "string"
+    },
+    "slots": {
+      "description": "Slots of this chunk.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SlotDecl"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "slots"
+  ],
+  "$defs": {
+    "SlotDecl": {
+      "description": "One planned slot.",
+      "type": "object",
+      "properties": {
+        "slot_ref": {
+          "description": "Producer key of the slot.",
+          "$ref": "#/$defs/ExternalKey"
+        },
+        "exec_inputs": {
+          "description": "Exact execution inputs.",
+          "$ref": "#/$defs/ExecInputs"
+        },
+        "required": {
+          "description": "Whether readiness requires it.",
+          "type": "boolean"
+        },
+        "build_reqs": {
+          "description": "Build requirements the slot depends on.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BuildReqRef"
+          },
+          "default": []
+        },
+        "expected": {
+          "description": "Expected outcome (negative and error-path tests).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Expected"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slot_ref",
+        "exec_inputs",
+        "required"
+      ]
+    },
+    "ExternalKey": {
+      "description": "A producer-chosen external key (`regression_ref`, `slot_ref`, ...): 1–200 characters of\n`[A-Za-z0-9._:/@+-]`, unique within `(project, producer, kind)`.",
+      "type": "string"
+    },
+    "ExecInputs": {
+      "description": "Exact execution inputs of a slot.",
+      "type": "object",
+      "properties": {
+        "test": {
+          "description": "Test name.",
+          "type": "string"
+        },
+        "seed": {
+          "description": "Seed as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "plusargs": {
+          "description": "Plusargs and run options, exactly as given and in order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "modes": {
+          "description": "Checking and simulator modes (e.g. `assertions: on`, `state: 4-state`).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "elaboration_modes": {
+          "description": "Modes that belong to elaboration (e.g. `-voptargs`), used for elaboration groups.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "extra": {
+          "description": "Namespaced extra inputs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "test",
+        "seed"
+      ]
+    },
+    "DecimalInteger": {
+      "description": "A non-negative decimal integer of up to 39 digits, as a string (seeds, large counters).",
+      "type": "string"
+    },
+    "BuildReqRef": {
+      "description": "A build requirement reference: the source and the build configuration.",
+      "type": "object",
+      "properties": {
+        "source_manifest_ref": {
+          "description": "Source manifest the build compiles.",
+          "$ref": "#/$defs/ExternalKey"
+        },
+        "build_config": {
+          "description": "Build configuration.",
+          "$ref": "#/$defs/BuildConfig"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source_manifest_ref",
+        "build_config"
+      ]
+    },
+    "BuildConfig": {
+      "description": "A build configuration (what is compiled and how).",
+      "type": "object",
+      "properties": {
+        "simulator": {
+          "description": "Simulator identity.",
+          "$ref": "#/$defs/Simulator"
+        },
+        "uvm_version": {
+          "description": "UVM version, when UVM is used.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "description": "Compile options, in order.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "defines": {
+          "description": "Defines (`NAME` or `NAME=VALUE`); duplicates are invalid.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "file_list_digest": {
+          "description": "Digest of the file list, when the flow can supply it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "simulator"
+      ]
+    },
+    "Simulator": {
+      "description": "Simulator identity, part of build configuration.",
+      "type": "object",
+      "properties": {
+        "vendor": {
+          "description": "Vendor/tool, e.g. `questa`, `vcs`, `verilator`.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Exact version string.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "vendor",
+        "version"
+      ]
+    },
+    "Digest": {
+      "description": "A `sha256:<64 lowercase hex>` digest.",
+      "type": "string"
+    },
+    "Expected": {
+      "description": "Expected outcome of a slot.",
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "description": "Expected verdict.",
+          "$ref": "#/$defs/ExpectedVerdict"
+        },
+        "diagnostics": {
+          "description": "Expected diagnostics; at least one when `verdict` is `fail`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedDiagnostic"
+          },
+          "default": []
+        },
+        "extras": {
+          "description": "Extras policy.",
+          "$ref": "#/$defs/Extras",
+          "default": "none"
+        },
+        "reason": {
+          "description": "Why the test is expected to behave so.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "reason"
+      ]
+    },
+    "ExpectedVerdict": {
+      "description": "Expected verdict of a negative or error-path test.",
+      "oneOf": [
+        {
+          "description": "The test passes (possibly with expected diagnostics).",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "The test fails with the expected diagnostics.",
+          "type": "string",
+          "const": "fail"
+        }
+      ]
+    },
+    "ExpectedDiagnostic": {
+      "description": "One expected diagnostic.",
+      "type": "object",
+      "properties": {
+        "diag_id": {
+          "description": "Namespaced diagnostic ID, e.g. `uvm:REF_DONE`.",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Observed severity.",
+          "$ref": "#/$defs/Severity"
+        },
+        "checker_id": {
+          "description": "Checker identity, when it must match.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "site": {
+          "description": "Normalized site (`file:line`), when it must match.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "count": {
+          "description": "Expected count.",
+          "$ref": "#/$defs/ExpectedCount"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "diag_id",
+        "severity",
+        "count"
+      ]
+    },
+    "Severity": {
+      "description": "Observed severity of a diagnostic.",
+      "oneOf": [
+        {
+          "description": "Informational.",
+          "type": "string",
+          "const": "info"
+        },
+        {
+          "description": "Warning.",
+          "type": "string",
+          "const": "warning"
+        },
+        {
+          "description": "Error.",
+          "type": "string",
+          "const": "error"
+        },
+        {
+          "description": "Fatal.",
+          "type": "string",
+          "const": "fatal"
+        }
+      ]
+    },
+    "ExpectedCount": {
+      "description": "Expected count of a diagnostic: exact (`3`) or at least (`\">=3\"`).",
+      "anyOf": [
+        {
+          "description": "Exactly this many.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        {
+          "description": "At least, written `\">=N\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "Extras": {
+      "description": "Which extra diagnostics an expectation tolerates.",
+      "oneOf": [
+        {
+          "description": "No other warning, error or fatal.",
+          "type": "string",
+          "const": "none"
+        },
+        {
+          "description": "Other warnings are allowed.",
+          "type": "string",
+          "const": "warnings_allowed"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hierarchy",
+  "description": "A hierarchy file.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "`dviscope.hierarchy/1` (optional in files; checked when present).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nodes": {
+      "description": "Nodes, parents before children; the order among siblings is the display order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Node"
+      }
+    },
+    "streams": {
+      "description": "Streams and their home node.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/StreamHome"
+      },
+      "default": []
+    },
+    "links": {
+      "description": "Reuse: a stream shown under another node too.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/StreamLink"
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "nodes"
+  ],
+  "$defs": {
+    "Node": {
+      "description": "A node.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Path: `/`-separated segments of `[a-z0-9_-]`, 1–64 characters each (`soc/cpu_ss`).",
+          "type": "string"
+        },
+        "title": {
+          "description": "Display title (default: the last segment).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    },
+    "StreamHome": {
+      "description": "A stream at its home node.",
+      "type": "object",
+      "properties": {
+        "node": {
+          "description": "Home node path.",
+          "type": "string"
+        },
+        "producer": {
+          "description": "Producer name.",
+          "type": "string"
+        },
+        "suite": {
+          "description": "Suite.",
+          "type": "string"
+        },
+        "branch": {
+          "description": "Repository-qualified branch, `repo/name`.",
+          "type": "string"
+        },
+        "cadence": {
+          "description": "Expected cadence: `nightly` (24 h), `weekly` (168 h), `<N>h`, or `none` (default).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "producer",
+        "suite",
+        "branch"
+      ]
+    },
+    "StreamLink": {
+      "description": "A stream linked under another node.",
+      "type": "object",
+      "properties": {
+        "node": {
+          "description": "Node path where it is also shown.",
+          "type": "string"
+        },
+        "stream": {
+          "description": "The stream (it must have a home).",
+          "$ref": "#/$defs/StreamRef"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "stream"
+      ]
+    },
+    "StreamRef": {
+      "description": "A stream's identity.",
+      "type": "object",
+      "properties": {
+        "producer": {
+          "description": "Producer (collector) name.",
+          "type": "string"
+        },
+        "suite": {
+          "description": "Suite.",
+          "type": "string"
+        },
+        "branch": {
+          "description": "Repository-qualified branch, `repo/name`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "producer",
+        "suite",
+        "branch"
+      ]
+    }
+  }
+}

@@ -1,0 +1,4 @@
+# Changes to workflows, release scripts and deployment need the maintainer's review.
+/.github/   @hexkDotCom
+/deploy/    @hexkDotCom
+/xtask/     @hexkDotCom

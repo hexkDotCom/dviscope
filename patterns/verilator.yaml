@@ -1,0 +1,104 @@
+# Verilator message forms (verilation and run).
+format: dviscope.rules/1.0
+pack: verilator
+version: 1.0.0
+tier: simulator
+simulator: verilator
+exit_code_meaningful: true
+detect:
+  - '^(\[\d+\] )?%(Error|Warning|Fatal)(-[A-Z0-9_]+)?: '
+  - '^- Verilator: '
+  - '^- V e r i l a t i o n   R e p o r t: '
+  - '^- S i m u l a t i o n   R e p o r t: '
+normalize: [sv_literal, hex, time, path, number, whitespace]
+boundaries:
+  - '^(\[\d+\] )?%(Error|Warning|Fatal)'
+  - '^- '
+  - '^-Info: '
+records:
+  # Run-time assertion or severity task: [time] %Error: file:line: Assertion failed in scope: msg
+  - id: runtime_msg
+    prefix: '['
+    start: '^\[(?P<t>\d+(?:\.\d+)?)(?P<u>[a-z]*)\] %(?P<sev>Error|Warning|Fatal)(?:-(?P<code>[A-Z0-9_]+))?: (?P<file>[^\s:]+):(?P<line>\d+): (?:Assertion failed in (?P<scope>\S+): )?(?P<msg>.*)$'
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'sv:severity_task'
+      kind: check
+      family: assertion
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      context: '${scope}'
+      fatal_witness: true
+  # %Error-CODE: file:line:col: msg, then source context lines.
+  - id: tool_msg
+    prefix: ['%Error', '%Warning', '%Fatal']
+    start: '^%(?P<sev>Error|Warning|Fatal)(?:-(?P<code>[A-Z0-9_]+))?: (?:(?P<file>[^\s:]+):(?P<line>\d+):(?:(?P<col>\d+):)? )?(?P<msg>.*)$'
+    continuation:
+      max_lines: 20
+      lines:
+        - {match: '^(?P<text>\s+.*|\s*: \.\.\. .*)$', append_to: detail}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'verilator:${code|untagged}'
+      checker_id: '${code}'
+      kind: other
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      display_fields: [detail]
+  - id: info
+    prefix: '-Info: '
+    start: '^-Info: (?P<msg>.*)$'
+markers:
+  - {id: verilation_report, match: '^- V e r i l a t i o n   R e p o r t: '}
+  - {id: verilation_walltime, match: '^- Verilator: Walltime [\d.]+ s'}
+  - {id: simulation_report, match: '^- S i m u l a t i o n   R e p o r t: ', trailer: true, design_loaded: true}
+  - {id: finish_line, match: '^- Verilator: \$finish at ', design_loaded: true}
+  # The runtime's $finish line, printed by any main (the generated one prints its report
+  # after it): a witness only for the declared verilator-model-main profile.
+  - {id: design_finish, match: '^- (?P<file>.+):(?P<line>\d+): Verilog \$finish\s*$'}
+  - {id: exiting_on_errors, match: '^%Error: Exiting due to \d+ error'}
+counters:
+  # The closing error count of a failed verilation: a protected failure count.
+  - id: exiting_count
+    domain: sim_tool
+    protected: true
+    match: '^%Error: Exiting due to (?P<n>\d+) error'
+    values:
+      - {key: errors, from: n, role: failure_count}
+completion:
+  profiles:
+    # A build ends with its report (success) or with the closing error count.
+    - {name: verilator-build, subject: build, requires: ['verilation_walltime|exiting_on_errors']}
+    - name: verilator-run
+      subject: simulation
+      requires: [simulation_report, finish_line]
+      verdict_required: true
+      early_fatal: true
+    # A model with its own C++ main (no Verilator report): chosen only when the run declares
+    # it (its slot's extra.tool.main = "model") and a project pack declares the model's
+    # console markers (completion.model_main); see docs/packs.md.
+    - name: verilator-model-main
+      subject: simulation
+      select: declared
+      requires: [design_finish]
+      verdict_required: true
+tests:
+  - name: tool message with context lines
+    simulator: verilator
+    subject: build
+    input: |
+      %Warning-WIDTH: top.sv:3:5: Operator ASSIGN expects 8 bits
+          3 |   assign a = b;
+            |          ^
+      %Error: top.sv:4:1: Syntax error
+      %Error: Exiting due to 1 error(s)
+    events: ['verilator:WIDTH@1', 'verilator:untagged@4']
+    completion: complete
+  - name: run-time assertion
+    simulator: verilator
+    input: |
+      [10] %Error: top.sv:9: Assertion failed in top.chk: value too big
+    events: ['sv:severity_task@1']

@@ -1,0 +1,82 @@
+name: Trial report
+description: You tried DVIScope on real logs. Tell us how it went, good or bad.
+title: "Trial: "
+labels: ["trial-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying DVIScope. **This issue is public.** Please do not paste log
+        text, file paths, test names, design names, hostnames or anything else confidential.
+        Counts and a description of the problem's shape are what we need.
+  - type: checkboxes
+    id: confidential
+    attributes:
+      label: Confidentiality
+      options:
+        - label: This report contains no log text and no confidential names or paths.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: DVIScope version
+      description: Output of `dviscope --version`
+    validations:
+      required: true
+  - type: input
+    id: tools
+    attributes:
+      label: Simulators and versions
+      placeholder: "Questa 2024.2, VCS W-2024.09"
+    validations:
+      required: true
+  - type: input
+    id: flow
+    attributes:
+      label: Testbench and flow
+      placeholder: "UVM 1.2, in-house regression runner on LSF"
+  - type: dropdown
+    id: reached
+    attributes:
+      label: How far did you get?
+      options:
+        - Could not install or run it
+        - Step 1, offline preview
+        - Step 2, single logs
+        - Step 3, server and triage
+        - Used it for several regressions
+    validations:
+      required: true
+  - type: textarea
+    id: counts
+    attributes:
+      label: Preview counts
+      description: From `import folder`, the numbers only.
+      placeholder: |
+        rows: 1200
+        with_log: 1187
+        expected_without_log: 13
+        unreadable: 0
+        failures_without_diagnostics: 4
+  - type: checkboxes
+    id: problems
+    attributes:
+      label: What went wrong?
+      options:
+        - label: A failed run was treated as passed (most serious)
+        - label: A passed run was reported as failed or incomplete
+        - label: Different root causes were grouped together
+        - label: One root cause was split into many signatures
+        - label: Failures had no recognized diagnostics
+        - label: Install, setup or documentation problem
+        - label: Too slow or too much memory
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Describe the shape of a problem instead of quoting it, for example "a fatal message wrapped over two lines".
+  - type: textarea
+    id: value
+    attributes:
+      label: Would this be useful for your team?
+      description: What is missing before you would use it regularly?

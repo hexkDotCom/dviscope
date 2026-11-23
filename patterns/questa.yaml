@@ -1,0 +1,149 @@
+# Questa message forms (compile and run). Detection uses message forms only, never the
+# tool banner. The run transcript prefixes every line with "# " (framing).
+format: dviscope.rules/1.0
+pack: questa
+version: 1.0.0
+tier: simulator
+simulator: questa
+exit_code_meaningful: false
+detect:
+  - '^\*\* (Note|Warning|Error|Fatal)(?: \(suppressible\))?: '
+  - '^(Start|End) time: \d\d:\d\d:\d\d on '
+  - '^(vsim|vlog|vopt) -'
+framing: {strip_prefix: '# '}
+normalize: [sv_literal, hex, time, path, number, whitespace]
+boundaries:
+  - '^\*\* (Note|Warning|Error|Fatal|Info)\b'
+  - '^(Start|End) time: '
+records:
+  # ** Error: (vlog-13069) file(416): text      ** Note: (vsim-8009) text
+  - id: tool_msg
+    prefix: ['** Error: (', '** Warning: (', '** Fatal: (', '** Note: (', '** Error (suppressible): (', '** Warning (suppressible): (', '** Fatal (suppressible): (', '** Note (suppressible): (']
+    start: '^\*\* (?P<sev>Error|Warning|Fatal|Note)(?: \(suppressible\))?: \((?P<id>(?P<tool>[a-z]+)-\d+)\) (?:(?P<file>[^\s()][^()]*)\((?P<line>\d+)\): )?(?P<msg>.*)$'
+    continuation:
+      max_lines: 4
+      lines:
+        - {match: '^(?P<text>[a-z].*)$', append_to: detail}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Note: info, Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'questa:${id}'
+      checker_id: '${id}'
+      kind: other
+      phase: {from: tool, map: {vlog: compile, vcom: compile, vopt: elaborate, vsim: run}, default: run}
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      display_fields: [detail]
+  # ** Error (suppressible): file(46): (vopt-2912) text
+  - id: tool_msg_at
+    prefix: ['** Error: ', '** Warning: ', '** Fatal: ', '** Error (suppressible): ', '** Warning (suppressible): ', '** Fatal (suppressible): ']
+    start: '^\*\* (?P<sev>Error|Warning|Fatal)(?: \(suppressible\))?: (?P<file>[^\s()][^()]*)\((?P<line>\d+)\): \((?P<id>(?P<tool>[a-z]+)-\d+)\) (?P<msg>.*)$'
+    continuation:
+      max_lines: 4
+      lines:
+        - {match: '^(?P<text>[a-z].*)$', append_to: detail}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'questa:${id}'
+      checker_id: '${id}'
+      kind: other
+      phase: {from: tool, map: {vlog: compile, vcom: compile, vopt: elaborate, vsim: run}, default: run}
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      display_fields: [detail]
+  # $error / $warning / $fatal / $info and immediate assertions: message line, then the
+  # "Time: ... Scope: ... File: ... Line: ..." line (mandatory).
+  - id: severity_task
+    prefix: ['** Error: ', '** Warning: ', '** Fatal: ', '** Info: ']
+    start: '^\*\* (?P<sev>Error|Warning|Fatal|Info): (?P<msg>.*)$'
+    continuation:
+      max_lines: 1
+      lines:
+        - {match: '^\s+Time: (?P<t>\d+(?:\.\d+)?) ?(?P<u>[a-z]+)\s+(?:Scope: (?P<scope>\S+)\s+)?File: (?P<file>.+?) Line: (?P<line>\d+)\s*$', capture: true, mandatory: true}
+    emit:
+      framework: simulator
+      severity: {from: sev, map: {Info: info, Warning: warning, Error: error, Fatal: fatal}}
+      diag_id: 'sv:severity_task'
+      kind: check
+      family: assertion
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      context: '${scope}'
+      fatal_witness: true
+  # ** Note: $finish : file(517) + "Time: ... Iteration: ... Instance: ..."
+  - id: finish_note
+    prefix: '** Note: $finish'
+    start: '^\*\* Note: \$finish\s*: (?P<file>.*)\((?P<line>\d+)\)$'
+    continuation:
+      max_lines: 1
+      lines:
+        - {match: '^\s+Time: .*$'}
+markers:
+  - {id: end_time, match: '^End time: \d\d:\d\d:\d\d on ', trailer: true}
+  # A design that does not load stops the run: a fatal witness (early completion with
+  # the end_time trailer and the errors line), e.g. a vopt elaboration failure.
+  - {id: design_load_failed, match: '^Error loading design$', design_loaded: false, fatal_witness: true}
+  - {id: design_unit_loaded, match: '^Loading [A-Za-z_]\w*\.[A-Za-z_]\w*(\(\w+\))?$', design_loaded: true}
+  - {id: finish_called, match: '^\*\* Note: \$finish\s*:', design_loaded: true}
+counters:
+  - id: errors_line
+    domain: sim_tool
+    protected: true
+    match: '^Errors: (?P<e>\d+), Warnings: (?P<w>\d+)$'
+    values:
+      - {key: errors, from: e, role: failure_count}
+      - {key: warnings, from: w, role: warning_count}
+reconcile:
+  - template: questa_sim_errors
+    counters: ['sim_tool:errors']
+    frameworks: [simulator, assertion]
+    severities: [error, fatal]
+completion:
+  profiles:
+    - {name: questa-compile, subject: build, requires: [errors_line]}
+    - name: questa-run
+      subject: simulation
+      requires: [end_time, errors_line]
+      design_loaded_known: true
+      verdict_required: true
+      early_fatal: true
+tests:
+  - name: an elaboration failure is complete (design not loaded)
+    simulator: questa
+    input: |
+      ** Error: (vopt-2912) design.sv(4): Unresolved reference to 'missing_mod'.
+      Error loading design
+      Errors: 1, Warnings: 0
+      End time: 01:06:00 on Nov 08,2026, Elapsed time: 0:00:01
+    events: ['questa:vopt-2912@1']
+    completion: complete
+  - name: tool message with an ID and a location
+    simulator: questa
+    subject: build
+    input: |
+      ** Error: (vlog-1) top.sv(3): near "x": bad thing.
+      Errors: 1, Warnings: 0
+    events: ['questa:vlog-1@1']
+    completion: complete
+  - name: severity task with its location line
+    simulator: questa
+    input: |
+      # ** Error: value is wrong
+      #    Time: 5 ns  Scope: top File: top.sv Line: 7
+      # ** Error: (vsim-2) another message
+    events: ['sv:severity_task@1', 'questa:vsim-2@3']
+  - name: a missing location line at the end cuts the record
+    simulator: questa
+    input: |
+      # ** Error: value is wrong
+    events: ['sv:severity_task@1']
+    record_cuts: 1
+  - name: a boundary where the location line was expected cuts the record
+    simulator: questa
+    input: |
+      # ** Error: value is wrong
+      # ** Error: (vsim-2) another message
+    events: ['sv:severity_task@1', 'questa:vsim-2@2']
+    record_cuts: 1

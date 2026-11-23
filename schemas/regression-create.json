@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RegressionCreate",
+  "description": "`POST /api/v1/projects/{p}/regressions`.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier (`dviscope.ingest/1.0-dev.N`).",
+      "type": "string"
+    },
+    "producer_id": {
+      "description": "Producer namespace.",
+      "$ref": "#/$defs/ExternalKey"
+    },
+    "regression_ref": {
+      "description": "Producer key of the regression.",
+      "$ref": "#/$defs/ExternalKey"
+    },
+    "suite": {
+      "description": "Suite name.",
+      "type": "string"
+    },
+    "branch": {
+      "description": "Repository-qualified branch.",
+      "$ref": "#/$defs/Branch"
+    },
+    "source_manifest_ref": {
+      "description": "The source manifest the regression runs.",
+      "$ref": "#/$defs/ExternalKey"
+    },
+    "trigger": {
+      "description": "What started it.",
+      "$ref": "#/$defs/Trigger"
+    },
+    "started_at": {
+      "description": "When it started (execution time, reported).",
+      "$ref": "#/$defs/UtcTime"
+    },
+    "labels": {
+      "description": "Free labels.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "links": {
+      "description": "Links (CI run, scheduler job), never fetched.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "ext": {
+      "description": "Extension data.",
+      "$ref": "#/$defs/Ext",
+      "default": {}
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "producer_id",
+    "regression_ref",
+    "suite",
+    "branch",
+    "source_manifest_ref",
+    "trigger",
+    "started_at"
+  ],
+  "$defs": {
+    "ExternalKey": {
+      "description": "A producer-chosen external key (`regression_ref`, `slot_ref`, ...): 1–200 characters of\n`[A-Za-z0-9._:/@+-]`, unique within `(project, producer, kind)`.",
+      "type": "string"
+    },
+    "Branch": {
+      "description": "A repository-qualified branch.",
+      "type": "object",
+      "properties": {
+        "repository": {
+          "description": "Project-registered repository name (never a URL).",
+          "type": "string"
+        },
+        "name": {
+          "description": "Branch name.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "name"
+      ]
+    },
+    "Trigger": {
+      "description": "The trigger of a regression.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Kind of trigger.",
+          "$ref": "#/$defs/TriggerKind"
+        },
+        "ref": {
+          "description": "Optional reference (e.g. merge request number), as text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    },
+    "TriggerKind": {
+      "description": "What started a regression.",
+      "oneOf": [
+        {
+          "description": "Scheduled nightly run.",
+          "type": "string",
+          "const": "nightly"
+        },
+        {
+          "description": "A merge or pull request.",
+          "type": "string",
+          "const": "merge_request"
+        },
+        {
+          "description": "Started by a person.",
+          "type": "string",
+          "const": "manual"
+        },
+        {
+          "description": "Anything else.",
+          "type": "string",
+          "const": "other"
+        }
+      ]
+    },
+    "UtcTime": {
+      "description": "RFC 3339 UTC timestamp ending in Z",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "Ext": {
+      "description": "Namespaced extension data (namespace.name keys); numbers must be integers within +/-(2^53-1)",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z0-9-]{1,64}\\.[A-Za-z0-9_.-]{1,128}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/ExtValue"
+      },
+      "$defs": {
+        "ExtValue": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExtValue"
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/ExtValue"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

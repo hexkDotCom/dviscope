@@ -1,0 +1,3 @@
+# Line endings: LF everywhere (scripts run in WSL/Linux; Windows tools handle LF).
+* text=auto eol=lf
+*.png binary

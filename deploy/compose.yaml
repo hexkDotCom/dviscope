@@ -1,0 +1,101 @@
+# Single-machine install: the server listens on 0.0.0.0:8443 inside its
+# container; the port is published on 127.0.0.1 only. PostgreSQL is never published.
+#
+#   deploy/provision-db.sh                                                  (database secrets)
+#   dviscope tls init --server-dir ~/.local/state/dviscope/server-staging   (CA key stays private)
+#   deploy/provision-tls.sh ~/.local/state/dviscope/server-staging          (UID 10001, 0400)
+#   docker compose up -d
+# `migrate` applies the schema and exits; `server` and `retention` start after it.
+# `retention` applies the retention policy every 24 hours (skipped during maintenance).
+# `ops` (profile ops) has the PostgreSQL client tools for backup and restore:
+#   docker compose run --rm ops backup --out /backups/dviscope-2026-11-10.dump
+# Renewal: `dviscope tls renew --server-dir <same staging>`, provision-tls.sh again, then
+# `docker compose restart server`. The compose directory must be on the Linux file system.
+name: dviscope
+
+x-build: &build
+  context: ..
+  dockerfile: deploy/Dockerfile
+
+x-dviscope: &dviscope
+  image: dviscope-server:dev
+  read_only: true
+  user: "10001:10001"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+
+services:
+  migrate:
+    <<: *dviscope
+    command: ["migrate"]
+    volumes:
+      - ./server.toml:/etc/dviscope/dviscope-server.toml:ro
+      - ./secrets/db_url:/run/secrets/db_url:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  server:
+    <<: *dviscope
+    build:
+      <<: *build
+      target: server
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./server.toml:/etc/dviscope/dviscope-server.toml:ro
+      - ./secrets/db_url:/run/secrets/db_url:ro
+      - ./tls/server.pem:/etc/dviscope/tls/server.pem:ro
+      - ./tls/server.key:/etc/dviscope/tls/server.key:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  retention:
+    <<: *dviscope
+    command: ["retention", "--every", "24"]
+    volumes:
+      - ./server.toml:/etc/dviscope/dviscope-server.toml:ro
+      - ./secrets/db_url:/run/secrets/db_url:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ops:
+    <<: *dviscope
+    image: dviscope-ops:dev
+    build:
+      <<: *build
+      target: ops
+    profiles: [ops]
+    volumes:
+      - ./server.toml:/etc/dviscope/dviscope-server.toml:ro
+      - ./secrets/db_url:/run/secrets/db_url:ro
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: dviscope
+      POSTGRES_USER: dviscope
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./secrets/db_password:/run/secrets/db_password:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dviscope", "-d", "dviscope"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:

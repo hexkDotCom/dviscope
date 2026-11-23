@@ -1,0 +1,4 @@
+{"producer_id": "nightly-runner", "regression_ref": "nightly-2026-11-10",
+ "slot_ref": "uart_tx.s1", "attempt_ref": "nightly-2026-11-10.uart_tx.a1",
+ "source_manifest_ref": "sm-2026-11-10",
+ "execution": {"test": "uart_tx", "seed": "1"}}

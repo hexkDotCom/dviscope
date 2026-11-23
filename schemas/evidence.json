@@ -1,0 +1,1732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence",
+  "description": "The evidence envelope.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier (`dviscope.evidence/1.0-dev.N`).",
+      "type": "string"
+    },
+    "evidence_revision": {
+      "description": "Evidence revision: advanced only by re-extraction (always 1 in 0.1).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "extractor": {
+      "description": "Extractor.",
+      "$ref": "#/$defs/Extractor"
+    },
+    "pipeline_digest": {
+      "description": "Pipeline digest.",
+      "$ref": "#/$defs/Digest"
+    },
+    "packs": {
+      "description": "Packs used, in order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PackRef"
+      }
+    },
+    "source": {
+      "description": "Source bytes.",
+      "$ref": "#/$defs/Source"
+    },
+    "completion": {
+      "description": "Completion.",
+      "$ref": "#/$defs/Completion"
+    },
+    "design_loaded": {
+      "description": "Design load state.",
+      "$ref": "#/$defs/DesignLoaded",
+      "default": "unknown"
+    },
+    "verdict_sources": {
+      "description": "Every verdict source seen.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VerdictSource"
+      }
+    },
+    "counters": {
+      "description": "Counters.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Counter"
+      }
+    },
+    "buckets": {
+      "description": "Exact accounting.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Bucket"
+      }
+    },
+    "families": {
+      "description": "Signature grouping.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Family"
+      }
+    },
+    "overflow": {
+      "description": "Overflow accounting.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OverflowEntry"
+      },
+      "default": []
+    },
+    "events": {
+      "description": "Example events.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Event"
+      }
+    },
+    "suppressed": {
+      "description": "Suppression records.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Suppressed"
+      },
+      "default": []
+    },
+    "excerpt": {
+      "description": "Excerpt.",
+      "$ref": "#/$defs/Excerpt"
+    },
+    "coverage": {
+      "description": "Parser coverage receipt.",
+      "$ref": "#/$defs/Coverage"
+    },
+    "resources": {
+      "description": "Resource figures from the log.",
+      "$ref": "#/$defs/LogResources",
+      "default": {
+        "source": "simulator_log"
+      }
+    },
+    "reconciliation": {
+      "description": "Reconciliations of summary counters with extracted events.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Reconciliation"
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evidence_revision",
+    "extractor",
+    "pipeline_digest",
+    "packs",
+    "source",
+    "completion",
+    "verdict_sources",
+    "counters",
+    "buckets",
+    "families",
+    "events",
+    "excerpt",
+    "coverage"
+  ],
+  "$defs": {
+    "Extractor": {
+      "description": "Identity of the extractor that produced the evidence.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Extractor name (`dviscope`).",
+          "type": "string"
+        },
+        "version": {
+          "description": "Extractor version.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "Digest": {
+      "description": "A `sha256:<64 lowercase hex>` digest.",
+      "type": "string"
+    },
+    "PackRef": {
+      "description": "A pattern pack used.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Pack ID.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Pack version.",
+          "type": "string"
+        },
+        "digest": {
+          "description": "Pack digest.",
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ]
+    },
+    "Source": {
+      "description": "The source bytes the evidence describes.",
+      "type": "object",
+      "properties": {
+        "log_name": {
+          "description": "File name of the log (no directories).",
+          "type": "string"
+        },
+        "bytes": {
+          "description": "Size in bytes.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "sha256": {
+          "description": "SHA-256 of the bytes (hex), computed by the extractor.",
+          "type": "string"
+        },
+        "encoding": {
+          "description": "Encoding read.",
+          "$ref": "#/$defs/Encoding"
+        },
+        "line_ending": {
+          "description": "Line endings.",
+          "$ref": "#/$defs/LineEnding"
+        },
+        "invalid_utf8_bytes": {
+          "description": "Number of invalid UTF-8 bytes replaced.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "segments": {
+          "description": "The streams the log joins, in order (a Verilator model with its own main: the\nprogram log, then the console), contiguous and covering every byte; absent for a\nsingle stream.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/LogSegment"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "log_name",
+        "bytes",
+        "sha256",
+        "encoding",
+        "line_ending",
+        "invalid_utf8_bytes"
+      ]
+    },
+    "SafeU64": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "Encoding": {
+      "description": "Text encoding the extractor read.",
+      "oneOf": [
+        {
+          "description": "UTF-8 (invalid bytes replaced and counted).",
+          "type": "string",
+          "const": "utf8"
+        }
+      ]
+    },
+    "LineEnding": {
+      "description": "Line ending found in the source.",
+      "oneOf": [
+        {
+          "description": "`\\n`.",
+          "type": "string",
+          "const": "lf"
+        },
+        {
+          "description": "`\\r\\n`.",
+          "type": "string",
+          "const": "crlf"
+        },
+        {
+          "description": "Both appear.",
+          "type": "string",
+          "const": "mixed"
+        },
+        {
+          "description": "No line break at all.",
+          "type": "string",
+          "const": "none"
+        }
+      ]
+    },
+    "LogSegment": {
+      "description": "One stream of a joined log: its bytes (half-open) and lines (1-based, inclusive, global\nover the joined log; both null for an empty segment).",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Stream.",
+          "$ref": "#/$defs/LogSegmentName"
+        },
+        "line_start": {
+          "description": "First line, or null when the segment holds no line.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SafeU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "line_end": {
+          "description": "Last line, or null when the segment holds no line.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SafeU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "byte_start": {
+          "description": "First byte (inclusive).",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "byte_end": {
+          "description": "End byte (exclusive).",
+          "$ref": "#/$defs/SafeU64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "byte_start",
+        "byte_end"
+      ]
+    },
+    "LogSegmentName": {
+      "description": "Which stream a segment of the log comes from.",
+      "oneOf": [
+        {
+          "description": "The program's own log file (`--log`).",
+          "type": "string",
+          "const": "program"
+        },
+        {
+          "description": "The console capture (`--console`).",
+          "type": "string",
+          "const": "console"
+        }
+      ]
+    },
+    "Completion": {
+      "description": "Completion of the log against its profile.",
+      "type": "object",
+      "properties": {
+        "profile": {
+          "description": "Profile name, e.g. `questa-run`.",
+          "type": "string"
+        },
+        "state": {
+          "description": "State.",
+          "$ref": "#/$defs/CompletionState"
+        },
+        "mode": {
+          "description": "Mode, only when complete.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompletionMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reasons": {
+          "description": "Reasons when not complete.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CompletionReason"
+          },
+          "default": []
+        },
+        "sections_seen": {
+          "description": "Required sections seen, in order (completion witness).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "verdict_required": {
+          "description": "Whether the profile requires a positive verdict source (outcome row 9).",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "state"
+      ]
+    },
+    "CompletionState": {
+      "description": "Completion state of the log.",
+      "oneOf": [
+        {
+          "description": "Every required component of the profile was seen.",
+          "type": "string",
+          "const": "complete"
+        },
+        {
+          "description": "Something required is missing or was cut.",
+          "type": "string",
+          "const": "incomplete"
+        },
+        {
+          "description": "No usable log.",
+          "type": "string",
+          "const": "missing"
+        }
+      ]
+    },
+    "CompletionMode": {
+      "description": "How a complete log ended.",
+      "oneOf": [
+        {
+          "description": "Every section present.",
+          "type": "string",
+          "const": "normal"
+        },
+        {
+          "description": "A recorded fatal and the simulator trailer.",
+          "type": "string",
+          "const": "early_fatal"
+        }
+      ]
+    },
+    "CompletionReason": {
+      "description": "Why a log is not complete.",
+      "oneOf": [
+        {
+          "description": "The trailer is missing.",
+          "type": "string",
+          "const": "no_end_marker"
+        },
+        {
+          "description": "The runner killed the process.",
+          "type": "string",
+          "const": "killed"
+        },
+        {
+          "description": "The runner's timeout fired.",
+          "type": "string",
+          "const": "timed_out"
+        },
+        {
+          "description": "The log is empty.",
+          "type": "string",
+          "const": "empty_log"
+        },
+        {
+          "description": "A reconciliation equation failed.",
+          "type": "string",
+          "const": "count_mismatch"
+        },
+        {
+          "description": "More buckets than the cap.",
+          "type": "string",
+          "const": "accounting_overflow"
+        },
+        {
+          "description": "A line was cut inside a failure record or required section.",
+          "type": "string",
+          "const": "line_cut"
+        },
+        {
+          "description": "A record was cut.",
+          "type": "string",
+          "const": "record_cut"
+        },
+        {
+          "description": "The log could not be read.",
+          "type": "string",
+          "const": "unreadable"
+        },
+        {
+          "description": "The supervisor could not record the termination.",
+          "type": "string",
+          "const": "unrecoverable_termination"
+        },
+        {
+          "description": "No profile applies (unknown simulator or kind).",
+          "type": "string",
+          "const": "unknown_profile"
+        },
+        {
+          "description": "A Verilator model with its own main: the log is not the program log and console\njoined by the collector.",
+          "type": "string",
+          "const": "segments_missing"
+        },
+        {
+          "description": "A Verilator model with its own main printed Verilator's own simulation report (or ran\nunder another simulator): it is not a custom-main run.",
+          "type": "string",
+          "const": "profile_conflict"
+        },
+        {
+          "description": "The run declares its own main but no project pack of the pipeline declares the\nmodel's markers.",
+          "type": "string",
+          "const": "model_main_undeclared"
+        },
+        {
+          "description": "The model's console witnesses are out of order.",
+          "type": "string",
+          "const": "witness_order"
+        },
+        {
+          "description": "A console witness of the model is missing or repeated (one execution per attempt).",
+          "type": "string",
+          "const": "witness_count"
+        },
+        {
+          "description": "A console witness appears in the program log, or a console verdict after the finish.",
+          "type": "string",
+          "const": "witness_segment"
+        }
+      ]
+    },
+    "DesignLoaded": {
+      "description": "Whether the design was loaded.",
+      "oneOf": [
+        {
+          "description": "Not established.",
+          "type": "string",
+          "const": "unknown"
+        },
+        {
+          "description": "Loaded.",
+          "type": "string",
+          "const": "true"
+        },
+        {
+          "description": "Failed to load.",
+          "type": "string",
+          "const": "false"
+        }
+      ]
+    },
+    "VerdictSource": {
+      "description": "One verdict source observation.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Which source.",
+          "$ref": "#/$defs/VerdictSourceKind"
+        },
+        "value": {
+          "description": "What it says.",
+          "$ref": "#/$defs/VerdictValue"
+        },
+        "span": {
+          "description": "Where (absent for the producer source).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "value"
+      ]
+    },
+    "VerdictSourceKind": {
+      "description": "A source of a verdict.",
+      "oneOf": [
+        {
+          "description": "UVM report summary.",
+          "type": "string",
+          "const": "uvm_summary"
+        },
+        {
+          "description": "A project banner (e.g. `SIMULATION PASSED`).",
+          "type": "string",
+          "const": "banner"
+        },
+        {
+          "description": "A test-result line.",
+          "type": "string",
+          "const": "test_result"
+        },
+        {
+          "description": "SVUnit runner summary.",
+          "type": "string",
+          "const": "svunit_runner"
+        },
+        {
+          "description": "Simulator error totals.",
+          "type": "string",
+          "const": "sim_totals"
+        },
+        {
+          "description": "The producer's reported outcome (normalized by the server).",
+          "type": "string",
+          "const": "producer"
+        }
+      ]
+    },
+    "VerdictValue": {
+      "description": "What a verdict source says.",
+      "oneOf": [
+        {
+          "description": "Pass.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "Fail.",
+          "type": "string",
+          "const": "fail"
+        },
+        {
+          "description": "Not applicable.",
+          "type": "string",
+          "const": "not_applicable"
+        }
+      ]
+    },
+    "Span": {
+      "description": "A byte and line span in the original log.",
+      "type": "object",
+      "properties": {
+        "line_start": {
+          "description": "First line, 1-based, inclusive.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "line_end": {
+          "description": "Last line, 1-based, inclusive.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "byte_start": {
+          "description": "First byte, 0-based, inclusive.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "byte_end": {
+          "description": "End byte, 0-based, exclusive.",
+          "$ref": "#/$defs/SafeU64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "line_start",
+        "line_end",
+        "byte_start",
+        "byte_end"
+      ]
+    },
+    "Counter": {
+      "description": "A counter read from a summary.",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Domain.",
+          "$ref": "#/$defs/CounterDomain"
+        },
+        "key": {
+          "description": "Key within the domain (severity, ID, check name).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value, exact, as a decimal string (summaries can exceed 2^53).",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "role": {
+          "description": "Role.",
+          "$ref": "#/$defs/CounterRole"
+        },
+        "protected": {
+          "description": "Whether no rule may claim or suppress it.",
+          "type": "boolean"
+        },
+        "explained_by": {
+          "description": "The diagnostic ID whose failing buckets account for this failure count (a check row\nof a project report), when the pack declares one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "description": "Where.",
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "key",
+        "value",
+        "role",
+        "protected",
+        "span"
+      ]
+    },
+    "CounterDomain": {
+      "description": "Counter domain.",
+      "oneOf": [
+        {
+          "description": "UVM counts by severity.",
+          "type": "string",
+          "const": "uvm_severity"
+        },
+        {
+          "description": "UVM counts by report ID.",
+          "type": "string",
+          "const": "uvm_by_id"
+        },
+        {
+          "description": "Simulator tool totals.",
+          "type": "string",
+          "const": "sim_tool"
+        },
+        {
+          "description": "Check counts (project checkers).",
+          "type": "string",
+          "const": "checks"
+        },
+        {
+          "description": "SVUnit counts.",
+          "type": "string",
+          "const": "svunit"
+        },
+        {
+          "description": "Banner counts.",
+          "type": "string",
+          "const": "banner"
+        },
+        {
+          "description": "Project-defined.",
+          "type": "string",
+          "const": "project"
+        }
+      ]
+    },
+    "DecimalInteger": {
+      "description": "A non-negative decimal integer of up to 39 digits, as a string (seeds, large counters).",
+      "type": "string"
+    },
+    "CounterRole": {
+      "description": "What a counter means.",
+      "oneOf": [
+        {
+          "description": "Counts failures; > 0 is a failure indication.",
+          "type": "string",
+          "const": "failure_count"
+        },
+        {
+          "description": "Counts warnings.",
+          "type": "string",
+          "const": "warning_count"
+        },
+        {
+          "description": "Counts successes.",
+          "type": "string",
+          "const": "success_count"
+        },
+        {
+          "description": "Informational.",
+          "type": "string",
+          "const": "info"
+        }
+      ]
+    },
+    "Bucket": {
+      "description": "Exact accounting unit.",
+      "type": "object",
+      "properties": {
+        "diag_id": {
+          "description": "Namespaced diagnostic ID.",
+          "type": "string"
+        },
+        "checker_id": {
+          "description": "Checker identity.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "site": {
+          "description": "Normalized site (`file:line`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_severity": {
+          "description": "Severity as observed.",
+          "$ref": "#/$defs/Severity"
+        },
+        "effective_severity": {
+          "description": "Severity after overrides.",
+          "$ref": "#/$defs/Severity"
+        },
+        "framework": {
+          "description": "Framework.",
+          "$ref": "#/$defs/Framework"
+        },
+        "phase": {
+          "description": "Phase.",
+          "$ref": "#/$defs/Phase"
+        },
+        "kind": {
+          "description": "Kind.",
+          "$ref": "#/$defs/DiagKind"
+        },
+        "provenance": {
+          "description": "Provenance.",
+          "$ref": "#/$defs/Provenance"
+        },
+        "fails_run": {
+          "description": "Whether it fails the run (computed).",
+          "type": "boolean"
+        },
+        "count": {
+          "description": "Exact count, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "family": {
+          "description": "Family (fingerprint) this bucket belongs to.",
+          "$ref": "#/$defs/Digest"
+        },
+        "first_ordinal": {
+          "description": "Ordinal of the first occurrence.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "example_ordinal": {
+          "description": "Ordinal of a retained example, if any.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SafeU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "diag_id",
+        "observed_severity",
+        "effective_severity",
+        "framework",
+        "phase",
+        "kind",
+        "provenance",
+        "fails_run",
+        "count",
+        "family",
+        "first_ordinal"
+      ]
+    },
+    "Severity": {
+      "description": "Observed severity of a diagnostic.",
+      "oneOf": [
+        {
+          "description": "Informational.",
+          "type": "string",
+          "const": "info"
+        },
+        {
+          "description": "Warning.",
+          "type": "string",
+          "const": "warning"
+        },
+        {
+          "description": "Error.",
+          "type": "string",
+          "const": "error"
+        },
+        {
+          "description": "Fatal.",
+          "type": "string",
+          "const": "fatal"
+        }
+      ]
+    },
+    "Framework": {
+      "description": "Reporting framework of a diagnostic.",
+      "oneOf": [
+        {
+          "description": "UVM report.",
+          "type": "string",
+          "const": "uvm"
+        },
+        {
+          "description": "Simulator message.",
+          "type": "string",
+          "const": "simulator"
+        },
+        {
+          "description": "Assertion failure.",
+          "type": "string",
+          "const": "assertion"
+        },
+        {
+          "description": "SVUnit.",
+          "type": "string",
+          "const": "svunit"
+        },
+        {
+          "description": "`$display`-style text.",
+          "type": "string",
+          "const": "display"
+        },
+        {
+          "description": "Runner facts.",
+          "type": "string",
+          "const": "runner"
+        },
+        {
+          "description": "Project pack.",
+          "type": "string",
+          "const": "project"
+        },
+        {
+          "description": "DVIScope's own synthetic events.",
+          "type": "string",
+          "const": "dviscope"
+        }
+      ]
+    },
+    "Phase": {
+      "description": "Phase of a diagnostic.",
+      "oneOf": [
+        {
+          "description": "Compilation.",
+          "type": "string",
+          "const": "compile"
+        },
+        {
+          "description": "Elaboration.",
+          "type": "string",
+          "const": "elaborate"
+        },
+        {
+          "description": "Run time.",
+          "type": "string",
+          "const": "run"
+        },
+        {
+          "description": "Not known.",
+          "type": "string",
+          "const": "unknown"
+        }
+      ]
+    },
+    "DiagKind": {
+      "description": "Kind of diagnostic.",
+      "oneOf": [
+        {
+          "description": "A check or comparison.",
+          "type": "string",
+          "const": "check"
+        },
+        {
+          "description": "An assertion.",
+          "type": "string",
+          "const": "assertion"
+        },
+        {
+          "description": "A timeout.",
+          "type": "string",
+          "const": "timeout"
+        },
+        {
+          "description": "A crash.",
+          "type": "string",
+          "const": "crash"
+        },
+        {
+          "description": "A build problem.",
+          "type": "string",
+          "const": "build"
+        },
+        {
+          "description": "X/Z values.",
+          "type": "string",
+          "const": "x_z"
+        },
+        {
+          "description": "Wrong usage (unknown test, bad option).",
+          "type": "string",
+          "const": "usage"
+        },
+        {
+          "description": "Resource exhaustion.",
+          "type": "string",
+          "const": "resource"
+        },
+        {
+          "description": "License problem.",
+          "type": "string",
+          "const": "license"
+        },
+        {
+          "description": "Anything else.",
+          "type": "string",
+          "const": "other"
+        }
+      ]
+    },
+    "Provenance": {
+      "description": "Where a bucket's failure indication comes from.",
+      "oneOf": [
+        {
+          "description": "Recognized by the fixed protected pre-pass; cannot be suppressed as a failure.",
+          "type": "string",
+          "const": "authoritative"
+        },
+        {
+          "description": "Matched by a pack or project rule.",
+          "type": "string",
+          "const": "rule"
+        },
+        {
+          "description": "Created by DVIScope (runner facts, evaluator, expectations).",
+          "type": "string",
+          "const": "synthetic"
+        }
+      ]
+    },
+    "Family": {
+      "description": "Signature grouping over buckets.",
+      "type": "object",
+      "properties": {
+        "fingerprint": {
+          "description": "Fingerprint (signature identity).",
+          "$ref": "#/$defs/Digest"
+        },
+        "family_kind": {
+          "description": "Family kind (`uvm-app`, `tool`, `assertion`, `runner`, `build`, `expectation`,\n`unexplained`, `incomplete`).",
+          "type": "string"
+        },
+        "diag_id": {
+          "description": "Diagnostic ID.",
+          "type": "string"
+        },
+        "checker_scope": {
+          "description": "Checker scope, when declared.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity_template": {
+          "description": "Identity template.",
+          "type": "string"
+        },
+        "significant": {
+          "description": "Significant field classes.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "display_template": {
+          "description": "Display template.",
+          "type": "string"
+        },
+        "buckets": {
+          "description": "Indices into `Evidence::buckets` of this family's buckets.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SafeU64"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fingerprint",
+        "family_kind",
+        "diag_id",
+        "identity_template",
+        "display_template",
+        "buckets"
+      ]
+    },
+    "OverflowEntry": {
+      "description": "Overflow accounting, exact by outcome-relevant dimensions.",
+      "type": "object",
+      "properties": {
+        "framework": {
+          "description": "Framework.",
+          "$ref": "#/$defs/Framework"
+        },
+        "phase": {
+          "description": "Phase.",
+          "$ref": "#/$defs/Phase"
+        },
+        "kind": {
+          "description": "Kind.",
+          "$ref": "#/$defs/DiagKind"
+        },
+        "observed_severity": {
+          "description": "Observed severity.",
+          "$ref": "#/$defs/Severity"
+        },
+        "provenance": {
+          "description": "Provenance.",
+          "$ref": "#/$defs/Provenance"
+        },
+        "fails_run": {
+          "description": "Fails the run.",
+          "type": "boolean"
+        },
+        "count": {
+          "description": "Exact count, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "framework",
+        "phase",
+        "kind",
+        "observed_severity",
+        "provenance",
+        "fails_run",
+        "count"
+      ]
+    },
+    "Event": {
+      "description": "An example event.",
+      "type": "object",
+      "properties": {
+        "ordinal": {
+          "description": "Ordinal in the log.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "provenance": {
+          "description": "Provenance.",
+          "$ref": "#/$defs/EventProvenance"
+        },
+        "phase": {
+          "description": "Phase.",
+          "$ref": "#/$defs/Phase"
+        },
+        "framework": {
+          "description": "Framework.",
+          "$ref": "#/$defs/Framework"
+        },
+        "observed_severity": {
+          "description": "Severity as observed.",
+          "$ref": "#/$defs/Severity"
+        },
+        "effective_severity": {
+          "description": "Severity after overrides.",
+          "$ref": "#/$defs/Severity"
+        },
+        "fails_run": {
+          "description": "Fails the run.",
+          "type": "boolean"
+        },
+        "diag_id": {
+          "description": "Diagnostic ID.",
+          "type": "string"
+        },
+        "checker_id": {
+          "description": "Checker identity.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "Kind.",
+          "$ref": "#/$defs/DiagKind"
+        },
+        "message_raw": {
+          "description": "Message as written (may contain personal data; never in URLs or metrics).",
+          "type": "string"
+        },
+        "display_template": {
+          "description": "Display template.",
+          "type": "string"
+        },
+        "identity_template": {
+          "description": "Identity template.",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Typed fields parsed from the record.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/FieldValue"
+          },
+          "default": {}
+        },
+        "significant": {
+          "description": "Significant field classes.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "sim_time": {
+          "description": "Simulation time as written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_anchor": {
+          "description": "Source anchor.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceAnchor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_path": {
+          "description": "Hierarchical context path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "normalization": {
+          "description": "Normalizations applied (\"why these match\").",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Normalization"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "provenance",
+        "phase",
+        "framework",
+        "observed_severity",
+        "effective_severity",
+        "fails_run",
+        "diag_id",
+        "kind",
+        "message_raw",
+        "display_template",
+        "identity_template"
+      ]
+    },
+    "EventProvenance": {
+      "description": "Where an example event came from.",
+      "oneOf": [
+        {
+          "description": "From the log.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "log"
+            },
+            "span": {
+              "description": "Span in the original bytes.",
+              "$ref": "#/$defs/Span"
+            },
+            "rule": {
+              "description": "Rule that claimed it (`pack/rule@version`).",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "span",
+            "rule"
+          ]
+        },
+        {
+          "description": "Created by DVIScope.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "synthetic"
+            },
+            "source": {
+              "description": "Producer of the synthetic event (`runner`, `evaluator`, `expectation`).",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Detail.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "source",
+            "detail"
+          ]
+        }
+      ]
+    },
+    "FieldValue": {
+      "description": "A typed field value parsed from a diagnostic.",
+      "oneOf": [
+        {
+          "description": "Text.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "A non-negative integer.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "integer"
+            },
+            "value": {
+              "$ref": "#/$defs/SafeU64"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "A SystemVerilog number literal as written (`32'hdead_beef`, `4'b10x1`).",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sv_literal"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "A simulation time with unit.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "time"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "description": "Value as written.",
+                  "type": "string"
+                },
+                "unit": {
+                  "description": "Unit (`fs`..`s`).",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "unit"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SourceAnchor": {
+      "description": "A source location named by a diagnostic.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Path as written (never resolved by the core).",
+          "type": "string"
+        },
+        "form": {
+          "description": "Form.",
+          "$ref": "#/$defs/AnchorForm"
+        },
+        "line": {
+          "description": "Line, when known.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SafeU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "form"
+      ]
+    },
+    "AnchorForm": {
+      "description": "Form of a source anchor.",
+      "oneOf": [
+        {
+          "description": "Full path as written.",
+          "type": "string",
+          "const": "full"
+        },
+        {
+          "description": "Repository-relative.",
+          "type": "string",
+          "const": "repo_relative"
+        },
+        {
+          "description": "Truncated by the tool (e.g. leading `..`); never treated as resolved.",
+          "type": "string",
+          "const": "truncated"
+        },
+        {
+          "description": "Not available.",
+          "type": "string",
+          "const": "unavailable"
+        }
+      ]
+    },
+    "Normalization": {
+      "description": "One normalization applied to a message or field.",
+      "type": "object",
+      "properties": {
+        "normalizer": {
+          "description": "Normalizer name (`sv_literal`, `hex`, `time`, `path`, ...).",
+          "type": "string"
+        },
+        "original": {
+          "description": "Original text.",
+          "type": "string"
+        },
+        "replacement": {
+          "description": "Replacement.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "normalizer",
+        "original",
+        "replacement"
+      ]
+    },
+    "Suppressed": {
+      "description": "Suppression record (bounded).",
+      "type": "object",
+      "properties": {
+        "rule_id": {
+          "description": "Rule ID.",
+          "type": "string"
+        },
+        "rule_version": {
+          "description": "Rule version.",
+          "type": "string"
+        },
+        "observed_severity": {
+          "description": "Severity as observed.",
+          "$ref": "#/$defs/Severity"
+        },
+        "count": {
+          "description": "Lines suppressed, exact, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "first_spans": {
+          "description": "First spans (at most 5).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Span"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "rule_version",
+        "observed_severity",
+        "count",
+        "first_spans"
+      ]
+    },
+    "Excerpt": {
+      "description": "Bounded excerpt.",
+      "type": "object",
+      "properties": {
+        "segments": {
+          "description": "Segments.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Segment"
+          }
+        },
+        "truncated": {
+          "description": "Whether the budget cut it.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "segments",
+        "truncated"
+      ]
+    },
+    "Segment": {
+      "description": "An excerpt segment.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Kind.",
+          "$ref": "#/$defs/SegmentKind"
+        },
+        "first_line": {
+          "description": "First line number.",
+          "$ref": "#/$defs/SafeU64"
+        },
+        "lines": {
+          "description": "Lines.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "first_line",
+        "lines"
+      ]
+    },
+    "SegmentKind": {
+      "description": "Excerpt segment kind.",
+      "oneOf": [
+        {
+          "description": "Lines before the primary record.",
+          "type": "string",
+          "const": "before_primary"
+        },
+        {
+          "description": "The primary record.",
+          "type": "string",
+          "const": "primary"
+        },
+        {
+          "description": "Lines after it.",
+          "type": "string",
+          "const": "after_primary"
+        },
+        {
+          "description": "The log's last lines.",
+          "type": "string",
+          "const": "tail"
+        }
+      ]
+    },
+    "Coverage": {
+      "description": "Parser coverage: error-like lines no rule claimed.",
+      "type": "object",
+      "properties": {
+        "unclaimed_error_like_lines": {
+          "description": "Count of unclaimed error-like lines, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "unclaimed_examples": {
+          "description": "Up to 5 spans of examples.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Span"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unclaimed_error_like_lines",
+        "unclaimed_examples"
+      ]
+    },
+    "LogResources": {
+      "description": "Resource figures read from the simulator log (the runner's figures are in `Runner`).",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Source of these figures.",
+          "$ref": "#/$defs/ResourceSource",
+          "default": "simulator_log"
+        },
+        "cycles": {
+          "description": "Simulated cycles, when the log reports them.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cycles"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sim_cpu_s": {
+          "description": "CPU seconds the simulator reported.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sim_mem_mb": {
+          "description": "Memory the simulator reported, MiB.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sim_time": {
+          "description": "Final simulation time as written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceSource": {
+      "description": "Where resource figures come from.",
+      "oneOf": [
+        {
+          "description": "Read from the simulator's own log lines.",
+          "type": "string",
+          "const": "simulator_log"
+        }
+      ]
+    },
+    "Cycles": {
+      "description": "Simulated cycles and the clock they count.",
+      "type": "object",
+      "properties": {
+        "value": {
+          "description": "Cycle count, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "clock": {
+          "description": "Name of the clock or counter behind the figure.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "clock"
+      ]
+    },
+    "Measure": {
+      "description": "A non-negative decimal measure with an optional fraction, as a string (`\"812.4\"`).",
+      "type": "string"
+    },
+    "Reconciliation": {
+      "description": "One reconciliation of summary counters with extracted events.",
+      "type": "object",
+      "properties": {
+        "template": {
+          "description": "Template name (`uvm_errors`, `questa_sim_errors`).",
+          "type": "string"
+        },
+        "counted": {
+          "description": "Sum of the template's counters, as a decimal string.",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "extracted": {
+          "description": "Extracted events of the template's population (observed, before suppression).",
+          "$ref": "#/$defs/DecimalInteger"
+        },
+        "relation": {
+          "description": "Relation checked.",
+          "$ref": "#/$defs/ReconcileRelation"
+        },
+        "holds": {
+          "description": "Whether the relation holds (a violation makes completion `count_mismatch`).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "template",
+        "counted",
+        "extracted",
+        "relation",
+        "holds"
+      ]
+    },
+    "ReconcileRelation": {
+      "description": "Relation a reconciliation template checks.",
+      "oneOf": [
+        {
+          "description": "Extracted ≤ counted (a summary may count messages it did not print).",
+          "type": "string",
+          "const": "at_most"
+        }
+      ]
+    }
+  }
+}

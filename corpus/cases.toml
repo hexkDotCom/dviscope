@@ -1,0 +1,237 @@
+# Corpus cases (schema dviscope.corpus/1). A group expands to one case per (simulator, run).
+# Case IDs: <group>-<nn> (lowercase; listed in public-ids.txt). Expectations are what the
+# design's own oracle must report for the case to be labelled:
+#   expect = "list"                         verdict and counts from the design's run list
+#   expect = { verdict = "...", include = ["ID:SEV", ...] }   oracle verdict and required IDs
+#   expect = { any_fails = true, include = [...] }   data-dependent: each run is either an
+#                                           activated failure with the IDs or a clean pass,
+#                                           and at least one run activates
+#   expect = { build = "fail", mentions = "file" }   the design's compile fails, naming the file
+#   expect = { build_or_runs = "fail", mentions = "file", run_marker = "..." }
+#                                           compile failure, or every run fails to load
+#   expect = { runner = "timeout" | "killed" }       the runner's own timeout or kill
+#   expect = { ..., exit = "nonzero", log = "partial", mentions_any = [...] }
+# Every verdict expectation also needs a good build and a run that exited by itself; a
+# passing run must exit 0.
+#   expect = { quirk = "toml" }             the outcome recorded in the quirk's quirk.toml
+# `control` names the group whose same-run case must have passed; `recovery` the group run
+# after the mutation was removed again (its build must start after the mutant finished).
+# All cases are judged within one campaign (`corpus.py campaign`).
+
+schema = "dviscope.corpus/1"
+
+[[group]]
+id = "ref-clean"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "clean"
+runs = "list+extra"
+extra = ["hexk_ref_pass_test | 101 | +ref_mode=mixed", "hexk_ref_pass_test | 102 | +ref_mode=mixed",
+         "hexk_ref_pass_test | 103 | +ref_mode=scramble", "hexk_ref_pass_test | 104 | +ref_mode=plain",
+         "hexk_ref_multi_test | 105 |", "hexk_ref_back_to_back_test | 106 |",
+         "hexk_ref_warm_reset_test | 107 |", "hexk_ref_ecc_test | 108 |"]
+expect = "list"
+
+[[group]]
+id = "ref-m01"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m01-crc-all"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_vectors_test | 5 |", "hexk_ref_multi_test | 7 |"]
+expect = { verdict = "FAILED", include = ["HEXK_SB_MISMATCH:E"] }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m02"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m02-crc-rare"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_pass_test | 3 | +ref_mode=scramble +ref_packets=40",
+        "hexk_ref_ecc_test | 9 |"]
+expect = { any_fails = true, include = ["HEXK_SB_MISMATCH:E"] }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m03"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m03-ecc-fix"
+runs = ["hexk_ref_ecc_test | 9 |"]
+expect = { verdict = "FAILED", include = ["REF_MEM_READ:E"] }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m04"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m04-x-data"
+runs = ["hexk_ref_pass_test | 2 | +ref_mode=plain +ref_irq=0"]
+expect = { verdict = "FAILED", include = ["REF_BUS_UNKNOWN:E"] }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m05"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m05-model-crc"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_vectors_test | 5 |"]
+expect = { verdict = "FAILED", include = ["HEXK_SB_MISMATCH:E"] }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m06"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m06-syntax"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed"]
+expect = { build = "fail", mentions = "hexk_ref_dut.sv" }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m07"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m07-elab-port"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_vectors_test | 5 |"]
+# VCS fails the build; Questa compiles and fails to load the design at every run.
+expect = { build_or_runs = "fail", mentions = "hexk_ref_tb.sv", run_marker = "Error loading design" }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m08-timeout"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m08-zero-time-hang"
+fault = "timeout"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed"]
+expect = { runner = "timeout" }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m08-kill"
+design = "hexk-ref"
+sims = ["vcs"]
+variant = "mutant:m08-zero-time-hang"
+fault = "kill"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed"]
+expect = { runner = "killed" }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-m09"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "mutant:m09-error-storm"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_vectors_test | 5 |"]
+# The banner still says PASSED; the oracle fails the run on the simulator errors.
+expect = { verdict = "PASSED", oracle_fails = true }
+control = "ref-clean"
+recovery = "ref-recovery"
+
+[[group]]
+id = "ref-bad-test"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "clean"
+fault = "bad-test"
+runs = ["hexk_ref_pass_test | 202 |"]
+expect = { verdict = "NONE", include = ["INVTST:F"] }
+
+[[group]]
+id = "ref-bad-knob"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "clean"
+fault = "bad-knob"
+runs = ["hexk_ref_pass_test | 203 |"]
+expect = { verdict = "FAILED", include = ["HEXK_KNOBS_VALUE:E"] }
+
+[[group]]
+id = "ref-memlimit"
+design = "hexk-ref"
+sims = ["vcs"]
+variant = "clean"
+fault = "memlimit"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed"]
+# The simulator starts, writes part of its log and stops on a failed allocation: no banner.
+expect = { verdict = "NONE", exit = "nonzero", log = "partial", mentions_any = ["memory"] }
+control = "ref-clean"
+
+[[group]]
+id = "ref-recovery"
+design = "hexk-ref"
+sims = ["questa", "vcs"]
+variant = "clean"
+runs = ["hexk_ref_pass_test | 1 | +ref_mode=mixed", "hexk_ref_pass_test | 2 | +ref_mode=plain +ref_irq=0",
+        "hexk_ref_pass_test | 3 | +ref_mode=scramble +ref_packets=40", "hexk_ref_vectors_test | 5 |",
+        "hexk_ref_multi_test | 7 |", "hexk_ref_ecc_test | 9 |"]
+expect = "list"
+
+[[group]]
+id = "unit-clean"
+design = "hexk-unit"
+sims = ["verilator"]
+variant = "clean"
+runs = ["hexk_math", "hexk_scoreboard"]
+expect = { verdict = "PASSED" }
+
+[[group]]
+id = "unit-m10"
+design = "hexk-unit"
+sims = ["verilator"]
+variant = "mutant:m10-unit-fail"
+runs = ["hexk_math"]
+expect = { verdict = "FAILED" }
+control = "unit-clean"
+recovery = "unit-recovery"
+
+[[group]]
+id = "unit-recovery"
+design = "hexk-unit"
+sims = ["verilator"]
+variant = "clean"
+runs = ["hexk_math"]
+expect = { verdict = "PASSED" }
+
+[[group]]
+id = "quirks"
+design = "quirks"
+sims = ["verilator", "vcs", "questa"]
+variant = "clean"
+runs = "all"
+expect = { quirk = "toml" }
+
+[[group]]
+id = "ibex-clean"
+design = "ibex"
+sims = ["verilator"]
+variant = "clean"
+runs = ["selfcheck"]
+expect = { verdict = "PASSED" }
+
+[[group]]
+id = "ibex-m11"
+design = "ibex"
+sims = ["verilator"]
+variant = "mutant:m11-ibex-xor"
+runs = ["selfcheck"]
+expect = { verdict = "FAILED" }
+control = "ibex-clean"
+recovery = "ibex-recovery"
+
+[[group]]
+id = "ibex-recovery"
+design = "ibex"
+sims = ["verilator"]
+variant = "clean"
+runs = ["selfcheck"]
+expect = { verdict = "PASSED" }

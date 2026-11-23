@@ -1,0 +1,26 @@
+[package]
+name = "dviscope-model"
+description = "DVIScope wire contracts: identifiers, canonical JSON, digests, schemas and error codes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+ulid.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

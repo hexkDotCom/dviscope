@@ -1,0 +1,46 @@
+# Corpus project pack: the self-checking program of the Ibex simple-system design
+# (corpus/designs/ibex/selfcheck).
+format: dviscope.rules/1.0
+pack: ibex-selfcheck
+version: 1.0.0
+tier: project
+detect:
+  - '^SELFCHECK (PASSED|FAILED)\b'
+records:
+  - id: failed
+    prefix: 'SELFCHECK FAILED'
+    start: '^SELFCHECK FAILED (?P<mask>[0-9a-fA-F]+)$'
+    emit:
+      framework: project
+      severity: error
+      diag_id: 'selfcheck:failed'
+      checker_id: 'selfcheck'
+      kind: check
+      message: 'self-check failed, mask ${mask}'
+      fields: [{name: mask, type: text}]
+      significance: {mask: verbatim}
+      normalize: []
+# Only the passing line is a verdict source: a line the pre-pass claims cannot also be a
+# diagnostic, and the failing line carries the failure mask (a diagnostic).
+verdicts:
+  - id: selfcheck
+    source: test_result
+    match: '^SELFCHECK PASSED$'
+    value: pass
+# The simple system has its own C++ main: no Verilator report. Its console prints a start
+# banner, Verilator's $finish line, then its statistics. Runs whose slot declares
+# extra.tool.main = "model" are judged by verilator-model-main with these markers.
+markers:
+  - {id: banner, match: '^Simulation of Ibex$'}
+  - {id: statistics, match: '^Simulation statistics$'}
+  - {id: cycles, match: '^Executed cycles: +\d+$'}
+  - {id: speed, match: '^Simulation speed: +\S+ cycles/s'}
+completion:
+  model_main:
+    start: banner
+    trailer: [statistics, cycles, speed]
+tests:
+  - name: failure with its mask
+    input: |
+      SELFCHECK FAILED 00000004
+    events: ['selfcheck:failed@1']

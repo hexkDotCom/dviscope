@@ -1,0 +1,142 @@
+# Release: only from a version tag that points to a commit on protected main. Clean build
+# (no caches shared with pull-request jobs), checksums, SBOM and build-provenance
+# attestation. Verify downloads with:
+#   gh attestation verify <file> --repo hexkDotCom/dviscope \
+#     --signer-workflow hexkDotCom/dviscope/.github/workflows/release.yml
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Tag must point to a commit on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Tag must name the packaged version
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          test -n "$version"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "tag $GITHUB_REF_NAME does not name the packaged version $version" >&2
+            exit 1
+          fi
+
+  # The exact commit passes every check (the same workflow as pull requests) before a
+  # build.
+  qualify:
+    needs: verify-tag
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build:
+    needs: [verify-tag, qualify]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Target
+        run: rustup target add ${{ matrix.target }}
+      - name: musl tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Node (preinstalled on the runner image)
+        run: node --version
+      - name: Static binaries, web UI and offline bundle (the same task as locally)
+        shell: bash
+        run: cargo run --locked -p xtask -- release-dry-run --target ${{ matrix.target }}
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir dist
+          cp target/dist/*.tar.gz target/dist/*.tar.gz.sha256 dist/
+      - name: SBOM
+        shell: bash
+        run: |
+          cargo install --locked cargo-cyclonedx@0.5.10
+          cargo cyclonedx --format json --target ${{ matrix.target }}
+          find crates -name '*.cdx.json' -exec cp {} dist/ \;
+          (cd web && npm sbom --sbom-format cyclonedx --omit dev > "../dist/dviscope-web-${{ matrix.target }}.cdx.json")
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/
+
+  # The only job that can write: it publishes what the jobs above built and attested. A
+  # version with a suffix (0.1.0-alpha.1) is marked as a pre-release.
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the built files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir built
+      - name: One flat list of release files
+        run: |
+          mkdir release
+          for d in built/dist-*; do
+            target=${d##*/dist-}
+            for f in "$d"/*; do
+              n=${f##*/}
+              case "$n" in
+                *"$target"*) ;;
+                *.cdx.json) n="${n%.cdx.json}-$target.cdx.json" ;;
+              esac
+              if [ -e "release/$n" ]; then
+                echo "duplicate release file $n" >&2
+                exit 1
+              fi
+              cp "$f" "release/$n"
+            done
+          done
+          ls -l release
+          test "$(find release -name '*.tar.gz' | wc -l)" -eq 2
+          test "$(find release -name '*.tar.gz.sha256' | wc -l)" -eq 2
+      - name: Release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v h="## [$version]" 'index($0, h) == 1 { p = 1; next } /^## \[/ { p = 0 } p' \
+            CHANGELOG.md > notes.md
+          test -s notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "DVIScope $GITHUB_REF_NAME" --notes-file notes.md $pre

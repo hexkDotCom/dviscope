@@ -1,0 +1,22 @@
+# Corpus project pack: result lines of the hexk-sv-sim-quirks probes.
+format: dviscope.rules/1.0
+pack: hexk-sim-quirks
+version: 1.0.0
+tier: project
+detect:
+  - '^QUIRK_RESULT: '
+records:
+  - id: result
+    prefix: 'QUIRK_'
+    start: '^QUIRK_(RESULT|WORKAROUND): .*$'
+verdicts:
+  - id: quirk_result
+    source: test_result
+    match: '^QUIRK_RESULT: (?P<v>AS_EXPECTED|DIFFERS)\b'
+    value: {from: v, map: {AS_EXPECTED: pass, DIFFERS: not_applicable}}
+tests:
+  - name: result lines are claimed
+    input: |
+      QUIRK_RESULT: AS_EXPECTED
+      QUIRK_WORKAROUND: OK
+    events: []

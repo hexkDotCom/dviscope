@@ -1,0 +1,121 @@
+# Corpus designs (schema dviscope.corpus/1). Sources are referenced by name; the private
+# configuration maps each name to a local checkout. Commands are argument arrays; the
+# placeholders are {src} (design checkout), {build} (build directory), {test}, {seed},
+# {plusargs} (expanded into separate arguments), {log}, {one_run_list}, {corpus}. `build` is
+# a list of commands, all of which must exit 0 unless `build_exit_meaningful = false`;
+# `build_ok` lists files that must exist; `build_ok_if` is a regex the build output must match;
+# `build_failed_if` a regex that marks a failed compile of the design (as opposed to a tool or
+# environment failure). A `{test}` in `build` means one build per run.
+
+schema = "dviscope.corpus/1"
+
+[design.hexk-ref]
+title = "hexk-sv-lib reference testbench"
+source = "hexk-sv-lib"
+tag = "v0.11.0"
+oracle = "hexk_check_run"
+# The reference regression list of the design gives verdict and expected counts per run.
+list = "tests/reference/hexk_ref_regression.txt"
+
+[design.hexk-ref.sim.questa]
+side = "windows"
+build = [["make", "-C", "{src}", "reference", "SIM=questa", "UVM=1.2", "PYTHON=py",
+          "REF_REGRESSION={one_run_list}", "REF_OUT={build}", "REF_TIMEOUT=20"]]
+# The Makefile has no compile-only target: it compiles, then runs a one-run list (kept
+# outside the build directory, which the Makefile deletes). A mutant may fail that run, so
+# the exit status says nothing about the compile; the run's log proves the compile finished
+# and the simulator started, and the Makefile's own line marks a failed compile (vlib
+# creates work/ before vlog fails).
+build_exit_meaningful = false
+build_failed_if = "^reference: compilation FAILED"
+build_ok = ["{build}/work", "{build}/01_hexk_ref_pass_test_1.log"]
+run = ["vsim", "-c", "-lib", "work", "-ldflags", "-lstdc++", "-sv_seed", "{seed}",
+       "-voptargs=+acc", "-do", "do {src}/scripts/hexk_example_run.do 50 ms", "-l", "{log}",
+       "+UVM_TESTNAME={test}", "+hexk_knobs_strict", "{plusargs}", "hexk_ref_tb"]
+run_cwd = "{build}"
+
+[design.hexk-ref.sim.vcs]
+side = "wsl"
+build = [["make", "-C", "{src}", "reference", "SIM=vcs", "UVM=1.2",
+          "REF_REGRESSION={one_run_list}", "REF_OUT={build}", "REF_TIMEOUT=20"]]
+build_exit_meaningful = false
+build_failed_if = "^reference: compilation FAILED"
+build_ok = ["{build}/simv", "{build}/01_hexk_ref_pass_test_1.log"]
+run = ["./simv", "-l", "{log}", "+ntb_random_seed={seed}", "+UVM_TESTNAME={test}",
+       "+hexk_knobs_strict", "{plusargs}"]
+run_cwd = "{build}"
+
+[design.hexk-unit]
+title = "hexk-sv-lib SVUnit unit tests"
+source = "hexk-sv-lib"
+tag = "v0.11.0"
+oracle = "svunit"
+
+[design.hexk-unit.sim.verilator]
+side = "wsl"
+build = []
+run = ["make", "-C", "{src}", "test", "SIM=verilator", "TEST={test}", "SVUNIT_OUT={build}/svunit"]
+run_cwd = "{src}"
+# The runner writes its log inside the build directory (one group per suite kind); the harness
+# copies the first that exists to {log}.
+log_from = ["{build}/svunit/core/test.log", "{build}/svunit/uvm/test.log"]
+
+[design.quirks]
+title = "hexk-sv-sim-quirks micro-designs"
+source = "hexk-sv-sim-quirks"
+tag = "main"
+oracle = "quirk"
+
+[design.quirks.sim.verilator]
+side = "wsl"
+build = [["verilator", "--binary", "--timing", "-j", "0", "--timescale", "1ns/1ps", "-Wno-fatal",
+          "-Wno-lint", "-Wno-style", "--top-module", "top", "-Mdir", "{build}/obj", "-o", "sim",
+          "{src}/quirks/{test}/test.sv"]]
+run = ["{build}/obj/sim"]
+run_cwd = "{build}"
+log_from = "stdout"
+
+[design.quirks.sim.vcs]
+side = "wsl"
+build = [["vcs", "-full64", "-sverilog", "-timescale=1ns/1ps", "-top", "top", "-o", "{build}/simv",
+          "{src}/quirks/{test}/test.sv"]]
+build_cwd = "{build}"
+run = ["{build}/simv"]
+run_cwd = "{build}"
+log_from = "stdout"
+
+[design.quirks.sim.questa]
+side = "windows"
+build = [["vlib", "{build}/work"],
+         ["vlog", "-sv", "-timescale", "1ns/1ps", "-work", "{build}/work", "{src}/quirks/{test}/test.sv"]]
+build_cwd = "{build}"
+run = ["vsim", "-c", "-work", "{build}/work", "top", "-do", "run -all; quit -f"]
+run_cwd = "{build}"
+log_from = "stdout"
+
+[design.ibex]
+title = "Ibex simple system on Verilator with the corpus self-check program"
+source = "ibex"
+tag = "65368a4c41d8e6c2e56ce816e418e21fc4e7b328"
+oracle = "selfcheck"
+# DVICode's ibex-dv (the core_ibex UVM bench) needs riscv-dv and commercial simulators; the
+# simple system runs on Verilator with a program from corpus/designs/ibex.
+
+[design.ibex.sim.verilator]
+side = "wsl"
+build = [["fusesoc", "--cores-root=.", "run", "--target=sim", "--setup", "--build",
+          "--build-root={build}", "lowrisc:ibex:ibex_simple_system",
+          "--BaseIsa=ibex_pkg::BaseIsaRV32I", "--RV32E=0", "--RV32M=ibex_pkg::RV32MFast",
+          "--RV32B=ibex_pkg::RV32BNone", "--RV32ZC=ibex_pkg::RV32Zca",
+          "--RegFile=ibex_pkg::RegFileFF", "--BranchTargetALU=0", "--WritebackStage=0",
+          "--ICache=0", "--ICacheECC=0", "--ICacheScramble=0", "--BranchPredictor=0",
+          "--DbgTriggerEn=0", "--SecureIbex=0", "--PMPEnable=0", "--PMPGranularity=0",
+          "--PMPNumRegions=4", "--MHPMCounterNum=0", "--MHPMCounterWidth=40"],
+         ["make", "-s", "-C", "{corpus}/designs/ibex/selfcheck", "IBEX={src}", "OUT={build}"]]
+build_cwd = "{src}"
+build_ok = ["{build}/lowrisc_ibex_ibex_simple_system_0/sim-verilator/Vibex_simple_system",
+            "{build}/selfcheck.elf"]
+run = ["{build}/lowrisc_ibex_ibex_simple_system_0/sim-verilator/Vibex_simple_system",
+       "--meminit=ram,{build}/selfcheck.elf"]
+run_cwd = "{build}"
+log_from = "{build}/ibex_simple_system.log"

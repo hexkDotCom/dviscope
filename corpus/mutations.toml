@@ -1,0 +1,87 @@
+# Fault injections (schema dviscope.corpus/1). Each mutation is a list of exact edits applied
+# to a private copy of the design: `find` must occur exactly once in `file`. Edits change source code of open designs; they contain no simulator output.
+
+schema = "dviscope.corpus/1"
+
+[mutation.m01-crc-all]
+class = "functional"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/rtl/hexk_ref_dut.sv", find = "s1_crc    <= crc_next ^ 32'hFFFF_FFFF;", replace = "s1_crc    <= crc_next ^ 32'hFFFF_FFFE;" }]
+
+[mutation.m02-crc-rare]
+class = "data_dependent"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/rtl/hexk_ref_dut.sv", find = "s1_crc    <= crc_next ^ 32'hFFFF_FFFF;", replace = "s1_crc    <= crc_next ^ ((in_data[5:0] == 6'h2A) ? 32'hFFFF_FFFE : 32'hFFFF_FFFF);" }]
+
+[mutation.m03-ecc-fix]
+class = "functional"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/rtl/hexk_ref_dut.sv", find = "fixed[syndrome] = ~fixed[syndrome];", replace = "fixed[syndrome] = fixed[syndrome];" }]
+
+[mutation.m04-x-data]
+class = "x_injection"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/rtl/hexk_ref_dut.sv", find = "s1_data   <= scramble ? (in_data ^ {lfsr_next, lfsr_next}) : in_data;", replace = "s1_data   <= scramble ? (in_data ^ {lfsr_next, lfsr_next}) : {in_data[31:1], (word_index == 5'd3) ? 1'bx : in_data[0]};" }]
+
+[mutation.m05-model-crc]
+class = "model_bug"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/env/hexk_ref_predictor.sv", find = "crc.update_byte(data[8*b+:8]);", replace = "crc.update_byte(data[8*b+:8] ^ 8'h01);" }]
+
+[mutation.m06-syntax]
+class = "syntax_error"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/rtl/hexk_ref_dut.sv", find = "endmodule", replace = "   logic broken_decl = ;\nendmodule" }]
+
+[mutation.m07-elab-port]
+class = "elaboration_error"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/tb/hexk_ref_tb.sv", find = "hexk_ref_dut dut (\n       .clk        (clk_rst_if.clk),", replace = "hexk_ref_dut dut (\n       .clock      (clk_rst_if.clk)," }]
+
+[mutation.m08-zero-time-hang]
+class = "zero_time_hang"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/tb/hexk_ref_tb.sv", find = "hexk_ref_dut dut (", replace = "initial begin #3us; forever begin int spin; spin++; end end\n\n   hexk_ref_dut dut (" }]
+
+[mutation.m09-error-storm]
+class = "error_storm"
+design = "hexk-ref"
+edits = [{ file = "tests/reference/tb/hexk_ref_tb.sv", find = "hexk_ref_dut dut (", replace = "initial begin #2us; forever @(posedge clk_rst_if.clk) $error(\"STORM spurious glitch on bus at %0t data=%h\", $time, $urandom); end\n\n   hexk_ref_dut dut (" }]
+
+[mutation.m10-unit-fail]
+class = "failing_unit_test"
+design = "hexk-unit"
+edits = [{ file = "tests/unit/hexk_math/hexk_math_unit_test.sv", find = "`FAIL_UNLESS_STR_EQUAL(s64(hexk_math::clamp(15, 0, 10)), \"10\")", replace = "`FAIL_UNLESS_STR_EQUAL(s64(hexk_math::clamp(15, 0, 10)), \"11\")" }]
+
+[mutation.m11-ibex-xor]
+class = "functional"
+design = "ibex"
+# XOR flips bit 0 when an operand is negative: the CRC step (XOR with the reflected
+# polynomial) breaks; the program's only XORs are in the CRC.
+edits = [{ file = "rtl/ibex_alu.sv", find = "assign bwlogic_xor_result = operand_a_i ^ bwlogic_operand_b;", replace = "assign bwlogic_xor_result = (operand_a_i ^ bwlogic_operand_b) ^ {31'b0, operand_a_i[31] | bwlogic_operand_b[31]};" }]
+
+# Runtime faults: applied by the runner, not by editing sources.
+[fault.timeout]
+class = "timeout"
+timeout_s = 3
+signal = "TERM"
+
+[fault.kill]
+class = "kill"
+timeout_s = 3
+signal = "KILL"
+
+[fault.bad-test]
+class = "bad_test_name"
+replace_test = "hexk_ref_nonexistent_test"
+
+[fault.bad-knob]
+class = "bad_knob"
+extra_plusargs = ["+ref_mode=bogus"]
+
+[fault.memlimit]
+class = "memory_limit"
+sides = ["wsl"]
+# Address-space limit: enough to start the simulator, too little to finish the run
+# (calibrated for the pilot's VCS; recalibrate on another version).
+ulimit_v_kb = 320000

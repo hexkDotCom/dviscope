@@ -1,0 +1,58 @@
+[package]
+name = "dviscope-cli"
+description = "DVIScope command-line client: collection, delivery, verdicts, doctor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "dviscope"
+path = "src/main.rs"
+
+[dependencies]
+dviscope-model.workspace = true
+dviscope-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+tokio.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
+rcgen = { workspace = true, features = ["x509-parser"] }
+x509-parser = "0.16"
+time.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+fd-lock = "4"
+sha2.workspace = true
+hex.workspace = true
+cap-std.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_Debug"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", default-features = false, features = ["signal", "process", "resource"] }
+
+[dev-dependencies]
+rustls.workspace = true
+dviscope-server = { path = "../dviscope-server" }
+axum-server.workspace = true
+sqlx.workspace = true
+
+# The workspace lints, except `unsafe_code`: deny here, allowed only in
+# `platform::windows`, each block with a SAFETY comment.
+[lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "warn"
+dbg_macro = "deny"
+print_stdout = "warn"

@@ -1,0 +1,72 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0-alpha.1"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+authors = ["HEXK"]
+repository = "https://github.com/hexkDotCom/dviscope"
+
+[workspace.dependencies]
+# internal
+dvi-simlog = { path = "crates/dvi-simlog" }
+dviscope-model = { path = "crates/dviscope-model" }
+dviscope-core = { path = "crates/dviscope-core" }
+# serialization and digests
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+schemars = "1"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
+regex-automata = { version = "0.4", default-features = false, features = ["std", "meta", "syntax", "perf", "unicode", "nfa", "hybrid", "dfa-onepass"] }
+regex-syntax = { version = "0.8", default-features = false, features = ["std", "unicode"] }
+regex = { version = "1", default-features = false, features = ["std", "perf", "unicode"] }
+ulid = "1"
+toml = "0.9"
+# server and client
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "fs", "time"] }
+axum = "0.8"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots", "json"] }
+rustls-native-certs = "0.8"
+rcgen = "0.13"
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+# database and auth (server)
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "json", "time"] }
+argon2 = "0.5"
+getrandom = "0.4"
+flate2 = "1"
+cap-std = "4"
+url = "2"
+base64 = "0.22"
+# tests
+proptest = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "warn"
+dbg_macro = "deny"
+print_stdout = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"
+panic = "unwind"

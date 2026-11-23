@@ -1,0 +1,91 @@
+# CI for pushes and pull requests (including forks). Runs on GitHub-hosted, throwaway
+# runners only, with a read-only token and no secrets. Never add pull_request_target here.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The release workflow runs these checks on the tagged commit before building.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    env:
+      # The test binaries overflow the runner's disk with full debug info. Line tables keep
+      # file and line numbers in panics and backtraces.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (pinned by rust-toolchain.toml)
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # PR caches are never shared with release jobs (release.yml builds without cache).
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: PostgreSQL for the database suites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=ci -p 127.0.0.1:5432:5432 \
+            --tmpfs /var/lib/postgresql/data postgres:17-bookworm
+          for _ in $(seq 1 60); do docker exec pg pg_isready -U postgres && break; sleep 1; done
+          echo "DVISCOPE_TEST_DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/postgres" >> "$GITHUB_ENV"
+          echo "DVISCOPE_REQUIRE_TEST_DB=1" >> "$GITHUB_ENV"
+      - name: Tests
+        run: cargo test --workspace
+      - name: Schemas up to date
+        run: cargo xtask schemas --check
+      - name: Reference docs up to date
+        run: cargo xtask docs --check
+      - name: Dependency edges
+        run: cargo xtask deps-check
+      - name: Publication rules
+        run: cargo xtask publication-check
+      - name: Sentinel
+        run: cargo xtask sentinel
+      - name: Workflow rules
+        run: cargo xtask workflow-check
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Web UI tests and build (Node preinstalled on the runner image)
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit -p .
+          npm test
+          npm run build
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: cargo-deny (licenses, advisories, bans, sources)
+        run: |
+          cargo install --locked cargo-deny@0.20.2
+          cargo deny check

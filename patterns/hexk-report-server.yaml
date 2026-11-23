@@ -1,0 +1,108 @@
+# Example project pack: the hexk-sv-lib report server (plan B.9.3, F9). Table lines
+# "E1  2305.000ns file:101  ID  context  message" with continuation lines, "..": truncated
+# file and context columns, the check table, and the PASSED/FAILED banners. Standard UVM
+# lines printed before the server is installed stay with the uvm pack.
+format: dviscope.rules/1.0
+pack: hexk-report-server
+version: 1.0.0
+tier: project
+detect:
+  - '^[IWEF]\d*\s+\d+\.\d{3}[munpf]?s '
+replaces: [uvm_summary]
+normalize: [sv_literal, hex, time, path, number, whitespace]
+boundaries:
+  - '^[IWEF]\d*\s+\d+\.\d{3}[munpf]?s '
+  - '^\S+: compilation FAILED \(log: '
+  - '^\$finish '
+  - '^\s+#{2,}'
+records:
+  - id: table
+    prefix: [I, W, E, F]
+    start: '^(?P<sev>[IWEF])(?P<n>\d*) +(?P<t>\d+\.\d+)(?P<u>[munpf]?s) +(?:(?P<file>\S+\.[A-Za-z]+):(?P<line>\d+) +)?(?P<id>\S+) +(?P<ctx>\S+)(?: +(?P<msg>.*))?$'
+    continuation:
+      max_lines: 200
+      lines:
+        - {match: '^(?P<text>.*)$', append_to: detail}
+    emit:
+      framework: uvm
+      severity: {from: sev, map: {I: info, W: warning, E: error, F: fatal}}
+      diag_id: 'uvm:${id}'
+      checker_id: '${id}'
+      checker_scope: '${ctx}'
+      kind: check
+      message: '${msg}'
+      anchor: {path: file, line: line}
+      sim_time: {value: t, unit: u}
+      context: '${ctx}'
+      display_fields: [detail]
+      fields_from_message:
+        - {name: act, match: '\bact=(?P<v>\S+)', type: sv_literal}
+      significance: {act: zero_vs_nonzero}
+      # Replicated register words (regs.mem_3, regs.mem_17) are one checker: opt in to
+      # index folding for this ID only (plan B.9.5).
+      normalize_for: {'uvm:REF_ECC_WORD': [index_fold]}
+      fatal_witness: true
+  - id: severity_id_table
+    prefix: 'Messages by severity and ID:'
+    start: '^Messages by severity and ID:$'
+    continuation:
+      max_lines: 200
+      lines:
+        - {match: '^\s+UVM_(INFO|WARNING|ERROR|FATAL)\s+\d+\s+\S+$'}
+  - id: first_error
+    prefix: 'First error: '
+    start: '^First error: .*$'
+    continuation:
+      max_lines: 200
+      lines:
+        - {match: '^.*$'}
+markers:
+  - {id: hexk_summary_heading, match: '^Messages by severity and ID:$'}
+  - {id: hexk_noisiest, match: '^Noisiest IDs: '}
+  - {id: hexk_banner, match: '^SIMULATION (PASSED|FAILED)(?: - [A-Z]+)? \('}
+counters:
+  # The total is the sum of the per-ID rows below.
+  - id: checks_executed
+    domain: checks
+    protected: true
+    match: '^Checks executed: (?P<p>\d+) passed, (?P<f>\d+) failed$'
+    values:
+      - {key: passed, from: p, role: success_count}
+      - {key: failed, from: f, role: info}
+  # A row's `failed` also counts check failures a test provokes on purpose and its report
+  # catcher demotes (the test then passes): it is information, not a failure count. An
+  # uncaught check failure still fails the run through its UVM_ERROR, the UVM severity
+  # counts and the FAILED banner and test result.
+  - id: check_row
+    domain: checks
+    protected: true
+    match: '^\s+(?P<p>\d+) passed\s+(?P<f>\d+) failed\s+(?P<id>\S+)$'
+    values:
+      - {key: '${id}:passed', from: p, role: success_count}
+      - {key: '${id}:failed', from: f, role: info}
+verdicts:
+  - id: banner
+    source: banner
+    match: '^SIMULATION (?P<v>PASSED|FAILED)(?: - [A-Z]+)? \('
+    value: {from: v, map: {PASSED: pass, FAILED: fail}}
+  - id: test_result
+    source: test_result
+    match: '^I\s+\d+\.\d+[munpf]?s\s+\S+\s+HEXK_TEST_RESULT\s+\S+\s+TEST (?P<v>PASSED|FAILED) \('
+    value: {from: v, map: {PASSED: pass, FAILED: fail}}
+sections:
+  - id: hexk_summary
+    open: hexk_summary_heading
+    requires: [hexk_noisiest, hexk_banner]
+completion:
+  requires_when_active: [hexk_summary]
+tests:
+  - name: table line with continuation, truncated columns and a banner
+    input: |
+      UVM_INFO @ 0: reporter [UVM/RELNOTES] before the server
+      I       0.000ns a.sv:4         START       ..ent.child   started
+      E1     10.000ns ..ong_name.sv:9 VALUE_CHECK env.chk     value act=0x0 exp=0x3
+      expected:
+      00 11 22
+      W1     20.000ns                CFG_NOTE    reporter     no file column
+      UVM_ERROR @ 30: env.chk [LATE] standard line after the table
+    events: ['uvm:UVM/RELNOTES@1', 'uvm:START@2', 'uvm:VALUE_CHECK@3', 'uvm:CFG_NOTE@6', 'uvm:LATE@7']

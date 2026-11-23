@@ -1,0 +1,21 @@
+# Error-like display lines no other pack claimed (framework display, never authoritative).
+format: dviscope.rules/1.0
+pack: generic
+version: 1.0.0
+tier: generic
+normalize: [sv_literal, hex, time, path, number, whitespace]
+records:
+  - id: display_error
+    start: '^\s*(?P<sev>ERROR|Error|FATAL|Fatal)\s*:\s*(?P<msg>\S.*)$'
+    emit:
+      framework: display
+      severity: {from: sev, map: {ERROR: error, Error: error, FATAL: fatal, Fatal: fatal}}
+      diag_id: 'display:error'
+      kind: other
+      message: '${msg}'
+tests:
+  - name: display error
+    input: |
+      something
+      ERROR: the thing broke
+    events: ['display:error@2']

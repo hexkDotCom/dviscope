@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourceManifest",
+  "description": "`POST /api/v1/projects/{p}/source-manifests`.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "Schema identifier.",
+      "type": "string"
+    },
+    "producer_id": {
+      "description": "Producer namespace.",
+      "$ref": "#/$defs/ExternalKey"
+    },
+    "source_manifest_ref": {
+      "description": "Producer key of the manifest.",
+      "$ref": "#/$defs/ExternalKey"
+    },
+    "repositories": {
+      "description": "Repositories and revisions.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SourceEntry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "producer_id",
+    "source_manifest_ref",
+    "repositories"
+  ],
+  "$defs": {
+    "ExternalKey": {
+      "description": "A producer-chosen external key (`regression_ref`, `slot_ref`, ...): 1–200 characters of\n`[A-Za-z0-9._:/@+-]`, unique within `(project, producer, kind)`.",
+      "type": "string"
+    },
+    "SourceEntry": {
+      "description": "One `(repository, revision)` of a source manifest.",
+      "type": "object",
+      "properties": {
+        "repository": {
+          "description": "Project-registered repository name.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "Revision (commit ID or equivalent).",
+          "type": "string"
+        },
+        "ancestry": {
+          "description": "Optional ancestry supplied by the flow (not part of the digest).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision"
+      ]
+    }
+  }
+}
