@@ -23,7 +23,7 @@ toml.workspace = true
 tokio.workspace = true
 reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 rcgen = { workspace = true, features = ["x509-parser"] }
-x509-parser = "0.16"
+x509-parser = "0.18"
 time.workspace = true
 clap.workspace = true
 anyhow.workspace = true
